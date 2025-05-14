@@ -16,30 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Simplified environment loading that works for both local and Vercel
-try:
-    current_dir = Path(__file__).parent
-    env_path = current_dir / '.env'
-    
-    if env_path.exists():
-        load_dotenv(env_path)
-        logger.info(f"Loaded .env file from {env_path}")
-    else:
-        logger.info("No .env file found - using system environment variables")
-except Exception as e:
-    logger.info(f"Environment setup: {e} - using system environment variables")
-
-# Get GROQ API key from environment
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
-
-if not GROQ_API_KEY:
-    logger.warning("GROQ_API_KEY not found in environment variables!")
-    logger.info("For local development: Create a .env file with GROQ_API_KEY=your_key")
-    logger.info("For Vercel: Set GROQ_API_KEY in the Vercel dashboard under Environment Variables")
-else:
-    logger.info(f"GROQ_API_KEY loaded successfully (starts with: {GROQ_API_KEY[:10]}...)")
-
-# Try multiple import methods for config
+# Try multiple import methods
 config_imported = False
 USER_INFO = None
 EMAIL_CONFIG = None
@@ -108,12 +85,58 @@ if not config_imported or not USER_INFO:
         "max_tokens": 500
     }
 
+# Debug: Show current directory and environment loading
+current_dir = Path(__file__).parent
+logger.info(f"Current directory: {current_dir}")
+logger.info(f"Looking for .env file at: {current_dir / '.env'}")
+
+# Load environment variables with explicit path
+env_path = current_dir / '.env'
+if env_path.exists():
+    logger.info(f".env file found at {env_path}")
+    load_dotenv(env_path)
+else:
+    logger.error(f".env file NOT found at {env_path}")
+    # Try loading from current working directory
+    logger.info(f"Trying to load from current working directory: {os.getcwd()}")
+    load_dotenv()
+
+# Debug: Print all environment variables (be careful in production!)
+logger.info("Environment variables loaded:")
+for key, value in os.environ.items():
+    if key.startswith("GROQ"):
+        logger.info(f"{key}: {value[:10]}..." if value else f"{key}: None")
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Additional debug
+if not GROQ_API_KEY:
+    logger.error("GROQ_API_KEY not found in environment variables!")
+    logger.error("Make sure your .env file contains: GROQ_API_KEY=your_actual_key")
+    
+    # Check if there's a similar key with different casing
+    for key in os.environ.keys():
+        if "GROQ" in key.upper() or "API" in key.upper():
+            logger.info(f"Found similar key: {key}")
+    
+    # Create a sample .env file if it doesn't exist
+    sample_env_path = current_dir / '.env.example'
+    if not env_path.exists() and not sample_env_path.exists():
+        with open(sample_env_path, 'w') as f:
+            f.write("GROQ_API_KEY=your_groq_api_key_here\n")
+        logger.info(f"Created sample .env file at {sample_env_path}")
+        logger.info("Please copy .env.example to .env and add your actual API key")
+    
+    raise ValueError("GROQ_API_KEY is required. Check the logs above for details.")
+else:
+    logger.info(f"GROQ_API_KEY loaded successfully (key starts with: {GROQ_API_KEY[:10]}...)")
+
 app = FastAPI()
 
-# CORS middleware - allow Chrome extensions
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*", "*"],  # Allow Chrome extensions and all origins for testing
+    allow_origins=["*"],  # Lock down in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -126,20 +149,12 @@ class PromptRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     logger.info("FastAPI server started successfully")
-    logger.info(f"API key configured: {bool(GROQ_API_KEY)}")
+    logger.info(f"Server running with Groq API key: {GROQ_API_KEY[:10]}...")
     logger.info(f"Using configuration for: {USER_INFO['full_name']} ({USER_INFO['email']})")
 
 @app.post("/generate")
 async def generate_reply(request: PromptRequest):
     try:
-        # Check if API key is available
-        if not GROQ_API_KEY:
-            logger.error("GROQ_API_KEY is not configured")
-            raise HTTPException(
-                status_code=500, 
-                detail="API key not configured. Please set GROQ_API_KEY in environment variables."
-            )
-            
         prompt_text = request.prompt
         logger.info(f"Received prompt: {prompt_text[:100]}...")  # Log first 100 chars
         
@@ -215,6 +230,7 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
         }
         
         logger.info(f"Sending request to Groq API with model: {payload['model']}")
+        logger.debug(f"Request payload: {json.dumps(payload, indent=2)}")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -227,6 +243,7 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
                     logger.info(f"Groq API response status: {resp.status}")
                     
                     response_text = await resp.text()
+                    logger.debug(f"Raw response: {response_text[:500]}...")  # Log first 500 chars
                     
                     if resp.status != 200:
                         logger.error(f"Groq API error: {resp.status}")
@@ -243,6 +260,7 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
                     # Parse successful response
                     try:
                         result = json.loads(response_text)
+                        logger.debug(f"Parsed response: {json.dumps(result, indent=2)}")
                         
                         # Extract reply from response
                         if "choices" not in result or len(result["choices"]) == 0:
@@ -289,6 +307,8 @@ async def health_check():
         "status": "healthy",
         "api_key_configured": bool(GROQ_API_KEY),
         "api_key_preview": f"{GROQ_API_KEY[:10]}..." if GROQ_API_KEY else None,
+        "env_file_path": str(env_path),
+        "env_file_exists": env_path.exists(),
         "config_imported": config_imported,
         "current_user": USER_INFO['full_name']
     }

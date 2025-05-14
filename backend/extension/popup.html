@@ -1,19 +1,254 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gmail Auto Reply</title>
+  <meta charset="UTF-8">
   <style>
     body {
-      font-family: sans-serif;
-      padding: 10px;
-      width: 200px;
+      width: 350px;
+      padding: 16px;
+      font-family: 'Roboto', Arial, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e8eaed;
+    }
+    
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .logo svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+    }
+    
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 400;
+      color: #202124;
+    }
+    
+    .subtitle {
+      margin: 0;
+      font-size: 12px;
+      color: #5f6368;
+    }
+    
+    .section {
+      margin-bottom: 20px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #3c4043;
+      margin-bottom: 12px;
+    }
+    
+    .info-box {
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34a853;
+    }
+    
+    .status-text {
+      font-size: 14px;
+      color: #3c4043;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    label {
+      display: block;
+      font-size: 14px;
+      color: #3c4043;
+      margin-bottom: 4px;
+    }
+    
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #1a73e8;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .primary-button {
+      background: #1a73e8;
+      color: white;
+      border: none;
+    }
+    
+    .primary-button:hover {
+      background: #1557b0;
+    }
+    
+    .secondary-button {
+      background: white;
+      color: #1a73e8;
+      border: 1px solid #dadce0;
+    }
+    
+    .secondary-button:hover {
+      background: #f8f9fa;
+    }
+    
+    .help-text {
+      font-size: 12px;
+      color: #5f6368;
+      margin-top: 4px;
+    }
+    
+    .divider {
+      border-top: 1px solid #e8eaed;
+      margin: 20px 0;
+    }
+    
+    .toggle-section {
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .toggle-section:hover {
+      color: #1a73e8;
+    }
+    
+    #customSignatureForm {
+      display: none;
+    }
+    
+    .success-message {
+      color: #34a853;
+      font-size: 14px;
+      margin-top: 8px;
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h3>Auto Gmail Reply</h3>
-  <p>Open an email → Click "✨ Auto-Reply"</p>
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24">
+        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Gmail Auto Reply</h1>
+      <p class="subtitle">AI-powered email assistant</p>
+    </div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">Extension Status</div>
+    <div class="info-box">
+      <div class="status">
+        <div class="status-dot"></div>
+        <span class="status-text">Extension is active</span>
+      </div>
+      <div class="help-text">The Auto-Reply button will appear when viewing emails in Gmail.</div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title toggle-section" id="toggleCustomSignature">
+      ▼ Customize Signature (Optional)
+    </div>
+    <div class="help-text">Set your own signature information for generated replies</div>
+    
+    <form id="customSignatureForm">
+      <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <input type="text" id="fullName" placeholder="John Doe">
+      </div>
+      
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="john.doe@example.com">
+      </div>
+      
+      <div class="form-group">
+        <label for="linkedin">LinkedIn Profile</label>
+        <input type="text" id="linkedin" placeholder="https://www.linkedin.com/in/johndoe">
+      </div>
+      
+      <div class="form-group">
+        <label for="phone">Phone Number</label>
+        <input type="text" id="phone" placeholder="+1 (555) 123-4567">
+      </div>
+      
+      <div class="button-group">
+        <button type="button" class="secondary-button" id="clearButton">Clear</button>
+        <button type="submit" class="primary-button">Save Preferences</button>
+      </div>
+      
+      <div class="success-message" id="successMessage">
+        ✓ Preferences saved successfully!
+      </div>
+    </form>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="help-text" style="text-align: center;">
+    Developed by <a href="https://www.linkedin.com/in/pramodsbaviskar/" target="_blank" style="color: #1a73e8; text-decoration: none;">Pramod Baviskar</a>
+  </div>
+  
+  <script src="popup.js"></script>
 </body>
 </html>
-
-
