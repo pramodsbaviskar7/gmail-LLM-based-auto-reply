@@ -6,6 +6,7 @@
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "https://mail.google.com/*",
+    "https://gmail-llm-based-auto-reply.vercel.app/*",
     "http://localhost:8000/*"
   ],
   "content_scripts": [
