@@ -2,8 +2,7 @@ console.log("✅ Gmail Auto LLM Reply: Content script loaded");
 
 const BUTTON_ID = "auto-reply-button";
 const MODAL_ID = "auto-reply-modal";
-const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app"; // Updated to Vercel URL
-// const BACKEND_URL = "http://localhost:8000"; // Update this if your backend runs on a different port
+const BACKEND_URL = "http://localhost:8000"; // Change to local for debugging
 let checkInterval = null;
 let currentUrl = window.location.href;
 
@@ -127,6 +126,142 @@ function createModal() {
       max-height: calc(85vh - 180px);
       overflow-y: auto;
     ">
+      <!-- Toggle for custom prompt -->
+      <div id="custom-prompt-toggle" style="
+        margin-bottom: 24px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        border: 1px solid #e8eaed;
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        ">
+          <div>
+            <h3 style="
+              margin: 0 0 4px 0;
+              font-family: 'Google Sans', Roboto, Arial, sans-serif;
+              font-size: 16px;
+              font-weight: 500;
+              color: #202124;
+            ">Custom Reply Mode</h3>
+            <p style="
+              margin: 0;
+              font-size: 13px;
+              color: #5f6368;
+            ">Provide your own instructions for the AI to generate replies</p>
+          </div>
+          <label class="toggle-switch" style="
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+          ">
+            <input type="checkbox" id="custom-mode-switch" style="
+              opacity: 0;
+              width: 0;
+              height: 0;
+            ">
+            <span class="slider" style="
+              position: absolute;
+              cursor: pointer;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background-color: #ccc;
+              transition: .4s;
+              border-radius: 34px;
+            "></span>
+          </label>
+        </div>
+        
+        <div id="custom-prompt-section" style="display: none;">
+          <textarea id="custom-prompt-input" placeholder="E.g., 'Write a polite rejection for this interview invitation mentioning schedule conflicts' or 'Cancel this meeting professionally, expressing gratitude'" style="
+            width: 100%;
+            min-height: 120px;
+            padding: 12px 16px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-family: Roboto, Arial, sans-serif;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.2s ease;
+            box-sizing: border-box;
+          "></textarea>
+          
+          <div style="
+            margin-top: 12px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+          ">
+            <button class="preset-btn" data-prompt="Write a polite rejection for this interview invitation due to other commitments" style="
+              padding: 8px 16px;
+              background: #e8f0fe;
+              border: 1px solid #c1d9fe;
+              border-radius: 8px;
+              color: #1a73e8;
+              font-size: 13px;
+              font-family: Roboto, Arial, sans-serif;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Reject Interview</button>
+            <button class="preset-btn" data-prompt="Cancel this meeting professionally, apologizing for the inconvenience" style="
+              padding: 8px 16px;
+              background: #e8f0fe;
+              border: 1px solid #c1d9fe;
+              border-radius: 8px;
+              color: #1a73e8;
+              font-size: 13px;
+              font-family: Roboto, Arial, sans-serif;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Cancel Meeting</button>
+            <button class="preset-btn" data-prompt="Postpone this appointment to next week, suggesting alternative times" style="
+              padding: 8px 16px;
+              background: #e8f0fe;
+              border: 1px solid #c1d9fe;
+              border-radius: 8px;
+              color: #1a73e8;
+              font-size: 13px;
+              font-family: Roboto, Arial, sans-serif;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Reschedule</button>
+          </div>
+          
+          <button id="generate-custom-reply" style="
+            margin-top: 16px;
+            width: 100%;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+          ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            Generate Reply
+          </button>
+        </div>
+      </div>
+      
       <div id="reply-content" style="
         min-height: 250px;
         padding: 24px;
@@ -275,6 +410,66 @@ function createModal() {
         display: none;
       }
       
+      /* Toggle switch styles */
+      .toggle-switch .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+      }
+      
+      .toggle-switch .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+      
+      .toggle-switch input:checked + .slider {
+        background-color: #1a73e8;
+      }
+      
+      .toggle-switch input:checked + .slider:before {
+        transform: translateX(22px);
+      }
+      
+      /* Preset button styles */
+      .preset-btn:hover {
+        background: #d2e3fc !important;
+        border-color: #a8c7fa !important;
+      }
+      
+      .preset-btn:active {
+        transform: scale(0.98);
+      }
+      
+      /* Generate button styles */
+      #generate-custom-reply:hover {
+        background: linear-gradient(135deg, #1557b0 0%, #1240a0 100%) !important;
+        box-shadow: 0 4px 8px rgba(26, 115, 232, 0.3) !important;
+        transform: translateY(-1px);
+      }
+      
+      #generate-custom-reply:active {
+        transform: translateY(0);
+      }
+      
+      /* Custom prompt input styles */
+      #custom-prompt-input:focus {
+        outline: none;
+        border-color: #1a73e8;
+      }
+      
       /* Scrollbar styling */
       #reply-content::-webkit-scrollbar {
         width: 8px;
@@ -314,6 +509,66 @@ function createModal() {
   
   document.body.appendChild(backdrop);
   document.body.appendChild(modal);
+  
+  // Add event listeners for toggle switch
+  const toggleSwitch = document.getElementById("custom-mode-switch");
+  const customPromptSection = document.getElementById("custom-prompt-section");
+  
+  toggleSwitch.addEventListener("change", (e) => {
+    customPromptSection.style.display = e.target.checked ? "block" : "none";
+    const replyContent = document.getElementById("reply-content");
+    
+    if (e.target.checked) {
+      // Hide the reply content in custom mode initially
+      replyContent.style.display = "none";
+    } else {
+      // Show the reply content and generate immediately in auto mode
+      replyContent.style.display = "block";
+      // Get the email content and generate reply automatically
+      const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+      if (emailContent) {
+        generateReplyContent(emailContent.innerText, false, null);
+      }
+    }
+  });
+  
+  // Add event listeners for preset buttons
+  const presetButtons = document.querySelectorAll(".preset-btn");
+  const customPromptInput = document.getElementById("custom-prompt-input");
+  
+  presetButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      customPromptInput.value = button.getAttribute("data-prompt");
+      // Visual feedback
+      button.style.background = "#c8e6c9";
+      button.style.borderColor = "#a5d6a7";
+      setTimeout(() => {
+        button.style.background = "#e8f0fe";
+        button.style.borderColor = "#c1d9fe";
+      }, 200);
+    });
+  });
+  
+  // Add event listener for Generate Reply button
+  const generateButton = document.getElementById("generate-custom-reply");
+  if (generateButton) {
+    generateButton.addEventListener("click", () => {
+      const customPrompt = customPromptInput.value.trim();
+      if (!customPrompt) {
+        alert("Please enter a custom prompt or select a preset option");
+        return;
+      }
+      
+      // Show reply content area and generate with custom prompt
+      const replyContent = document.getElementById("reply-content");
+      replyContent.style.display = "block";
+      
+      const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+      if (emailContent) {
+        generateReplyContent(emailContent.innerText, true, customPrompt);
+      }
+    });
+  }
   
   // Add event listeners
   backdrop.addEventListener("click", () => {
@@ -425,10 +680,33 @@ async function generateReply(emailContent) {
   const modal = modalElements.modal;
   const backdrop = modalElements.backdrop;
   
-  // Get the reply content div
+  // Get the custom mode settings
+  const customModeSwitch = document.getElementById("custom-mode-switch");
+  const customPromptInput = document.getElementById("custom-prompt-input");
   const replyContent = document.getElementById("reply-content");
   
-  // IMPORTANT: Clear any previous content and show loading immediately
+  // Show modal with animation
+  backdrop.style.display = "block";
+  modal.style.display = "block";
+  backdrop.style.animation = "fadeIn 0.3s ease-out";
+  modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
+  
+  // If custom mode is enabled, just show the UI and wait for user input
+  if (customModeSwitch && customModeSwitch.checked) {
+    replyContent.style.display = "none";
+    return;
+  }
+  
+  // Otherwise, generate reply automatically
+  replyContent.style.display = "block";
+  generateReplyContent(emailContent, false, null);
+}
+
+// Helper function to generate reply content
+async function generateReplyContent(emailContent, useCustomPrompt, customPrompt) {
+  const replyContent = document.getElementById("reply-content");
+  
+  // Show loading state
   replyContent.innerHTML = `
     <div class="loading-state" style="
       text-align: center;
@@ -477,23 +755,19 @@ async function generateReply(emailContent) {
     </div>
   `;
   
-  // Reset opacity
   replyContent.style.opacity = "1";
   replyContent.classList.add("loading");
   
-  // Show modal with animation
-  backdrop.style.display = "block";
-  modal.style.display = "block";
-  backdrop.style.animation = "fadeIn 0.3s ease-out";
-  modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
-  
   try {
-    // Prepare request body - removing email detection for now since it's causing issues
+    // Prepare request body based on mode
     const requestBody = {
-      prompt: emailContent
+      prompt: emailContent,
+      useCustomPrompt: Boolean(useCustomPrompt),  // Ensure boolean
+      customPrompt: customPrompt || null  // Ensure null if empty
     };
     
-    console.log("Sending request with:", requestBody);
+    console.log("Sending request to:", `${BACKEND_URL}/generate`);
+    console.log("Request body:", JSON.stringify(requestBody, null, 2));
     
     const response = await fetch(`${BACKEND_URL}/generate`, {
       method: 'POST',
@@ -503,11 +777,27 @@ async function generateReply(emailContent) {
       body: JSON.stringify(requestBody)
     });
     
+    // Log response details
+    console.log("Response status:", response.status);
+    console.log("Response headers:", response.headers);
+    
+    const responseText = await response.text();
+    console.log("Response text:", responseText);
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error("Response not OK:", response.status);
+      // Try to parse as JSON for error details
+      try {
+        const errorData = JSON.parse(responseText);
+        console.error("Error data:", errorData);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorData.detail || responseText}`);
+      } catch (e) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
     }
     
-    const data = await response.json();
+    // Parse successful response
+    const data = JSON.parse(responseText);
     
     if (data.error) {
       throw new Error(data.error);
@@ -527,6 +817,8 @@ async function generateReply(emailContent) {
     
   } catch (error) {
     console.error("Error generating reply:", error);
+    console.error("Error details:", error.message, error.stack);
+    
     replyContent.classList.remove("loading");
     replyContent.innerHTML = `
       <div style="text-align: center; padding: 40px 20px;">
@@ -561,6 +853,21 @@ function clearModalContent() {
   if (replyContent) {
     replyContent.innerHTML = '';
     replyContent.classList.remove("loading");
+  }
+  
+  // Reset custom prompt toggle
+  const customModeSwitch = document.getElementById("custom-mode-switch");
+  const customPromptSection = document.getElementById("custom-prompt-section");
+  const customPromptInput = document.getElementById("custom-prompt-input");
+  
+  if (customModeSwitch) {
+    customModeSwitch.checked = false;
+  }
+  if (customPromptSection) {
+    customPromptSection.style.display = "none";
+  }
+  if (customPromptInput) {
+    customPromptInput.value = "";
   }
 }
 

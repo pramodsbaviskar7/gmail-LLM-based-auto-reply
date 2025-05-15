@@ -1,9 +1,10 @@
 import os
 import logging
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
+from typing import Optional
 import aiohttp
 from dotenv import load_dotenv
 import json
@@ -145,6 +146,8 @@ logger.info("CORS middleware configured")
 
 class PromptRequest(BaseModel):
     prompt: str
+    useCustomPrompt: bool = False
+    customPrompt: str = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -153,10 +156,24 @@ async def startup_event():
     logger.info(f"Using configuration for: {USER_INFO['full_name']} ({USER_INFO['email']})")
 
 @app.post("/generate")
-async def generate_reply(request: PromptRequest):
+async def generate_reply(request: Request):
     try:
-        prompt_text = request.prompt
-        logger.info(f"Received prompt: {prompt_text[:100]}...")  # Log first 100 chars
+        # Get the raw data as dictionary
+        data = await request.json()
+        logger.info(f"Raw request data: {data}")
+        
+        # Extract fields with proper handling of None/null
+        prompt_text = data.get('prompt', '')
+        use_custom_prompt = data.get('useCustomPrompt', False)
+        custom_prompt = data.get('customPrompt')
+        
+        # Convert null to None if needed
+        if custom_prompt is None or custom_prompt == "null":
+            custom_prompt = None
+            
+        logger.info(f"Parsed - prompt: {prompt_text[:100]}...")
+        logger.info(f"Parsed - useCustomPrompt: {use_custom_prompt}")
+        logger.info(f"Parsed - customPrompt: {custom_prompt[:100] if custom_prompt else 'None'}...")
         
         if not prompt_text:
             logger.error("Empty prompt received")
@@ -167,7 +184,7 @@ async def generate_reply(request: PromptRequest):
             "Content-Type": "application/json"
         }
         
-        # Few-shot examples for consistent formatting with actual user info
+        # Signature template
         signature_template = f"""{EMAIL_CONFIG['default_closing']},
 {USER_INFO['full_name']}
 {USER_INFO['email']}
@@ -176,35 +193,53 @@ async def generate_reply(request: PromptRequest):
 
         logger.info(f"Using signature template:\n{signature_template}")
 
-        system_prompt = f"""You're a helpful assistant that writes professional Gmail replies. 
+        # Different system prompts based on mode
+        if use_custom_prompt and custom_prompt:
+            # Custom mode: Use user's instructions
+            system_prompt = f"""You're a helpful assistant that writes Gmail replies based on specific instructions. 
+Follow these user instructions: {custom_prompt}
+
+Always end your replies with this professional signature:
+
+{signature_template}
+
+Important: Follow the user's instructions carefully while maintaining professionalism."""
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Here's the email to respond to:\n\n{prompt_text}"}
+            ]
+        else:
+            # Auto mode: Use default behavior with few-shot examples
+            system_prompt = f"""You're a helpful assistant that writes professional Gmail replies. 
 Always end your replies with a professional signature in this exact format:
 
 {signature_template}
 
 Important: Use this exact signature information in all replies. The name is {USER_INFO['full_name']}, email is {USER_INFO['email']}, LinkedIn is {USER_INFO['linkedin']}, and mobile is {USER_INFO['mobile']}."""
 
-        few_shot_examples = [
-            {
-                "role": "user",
-                "content": "Reply to: Hi, I'd like to schedule a meeting to discuss the project timeline."
-            },
-            {
-                "role": "assistant",
-                "content": f"""Thank you for reaching out regarding the project timeline discussion. I would be happy to schedule a meeting with you.
+            few_shot_examples = [
+                {
+                    "role": "user",
+                    "content": "Reply to: Hi, I'd like to schedule a meeting to discuss the project timeline."
+                },
+                {
+                    "role": "assistant",
+                    "content": f"""Thank you for reaching out regarding the project timeline discussion. I would be happy to schedule a meeting with you.
 
 I'm available this week on Tuesday and Thursday afternoons, or any time on Friday. Please let me know what time works best for you, and I'll send a calendar invite.
 
 Looking forward to our discussion.
 
 {signature_template}"""
-            },
-            {
-                "role": "user",
-                "content": "Reply to: Thanks for your proposal. Can you provide more details about the pricing?"
-            },
-            {
-                "role": "assistant",
-                "content": f"""Thank you for your interest in our proposal. I'm glad to provide more detailed pricing information.
+                },
+                {
+                    "role": "user",
+                    "content": "Reply to: Thanks for your proposal. Can you provide more details about the pricing?"
+                },
+                {
+                    "role": "assistant",
+                    "content": f"""Thank you for your interest in our proposal. I'm glad to provide more detailed pricing information.
 
 I'll prepare a comprehensive pricing breakdown that includes:
 - Individual service costs
@@ -214,13 +249,13 @@ I'll prepare a comprehensive pricing breakdown that includes:
 I'll have this ready for you by tomorrow afternoon. Would you prefer to receive this via email or would you like to schedule a brief call to go through it together?
 
 {signature_template}"""
-            }
-        ]
+                }
+            ]
 
-        # Construct the messages with few-shot examples
-        messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(few_shot_examples)
-        messages.append({"role": "user", "content": f"Reply to this email:\n\n{prompt_text}"})
+            # Construct the messages with few-shot examples
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.extend(few_shot_examples)
+            messages.append({"role": "user", "content": f"Reply to this email:\n\n{prompt_text}"})
 
         payload = {
             "messages": messages,
@@ -288,6 +323,35 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
     except Exception as e:
         logger.error(f"Unexpected error: {type(e).__name__}: {e}", exc_info=True)
         return {"error": f"Internal server error: {str(e)}"}
+
+@app.post("/generate-flexible")
+async def generate_reply_flexible(request: Request):
+    """Flexible endpoint that accepts any JSON"""
+    try:
+        body = await request.json()
+        logger.info(f"Flexible endpoint received: {body}")
+        
+        # Extract required and optional fields
+        prompt_text = body.get('prompt', '')
+        use_custom_prompt = body.get('useCustomPrompt', False)
+        custom_prompt = body.get('customPrompt', None)
+        
+        if not prompt_text:
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+            
+        # Continue with the same logic as the main generate function
+        # ... (rest of the generation logic)
+        
+        return {"reply": "Debug response - check logs"}
+    except Exception as e:
+        logger.error(f"Flexible endpoint error: {e}")
+        return {"error": str(e)}
+
+@app.post("/debug-generate")
+async def debug_generate_reply(request: dict):
+    """Debug endpoint to see raw request data"""
+    logger.info(f"Raw request data: {request}")
+    return {"received": request, "status": "debug"}
 
 @app.get("/config")
 async def get_config():
