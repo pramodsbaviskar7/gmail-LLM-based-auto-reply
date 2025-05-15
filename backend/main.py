@@ -195,19 +195,20 @@ async def generate_reply(request: Request):
 
         # Different system prompts based on mode
         if use_custom_prompt and custom_prompt:
-            # Custom mode: Use user's instructions
-            system_prompt = f"""You're a helpful assistant that writes Gmail replies based on specific instructions. 
-Follow these user instructions: {custom_prompt}
+            # Custom mode: Use user's instructions with direct response
+            system_prompt = f"""You are writing an email reply. Follow the user's specific instructions to craft the response. 
+Write the email content directly without any meta-text, introductions, or explanations.
+Just write the email body as requested.
 
-Always end your replies with this professional signature:
+End your email with this signature:
 
 {signature_template}
 
-Important: Follow the user's instructions carefully while maintaining professionalism."""
+Remember: Only output the email content directly. No instructions, no "Here is your reply:", just the email itself."""
             
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Here's the email to respond to:\n\n{prompt_text}"}
+                {"role": "user", "content": f"Original email: {prompt_text}\n\nInstructions: {custom_prompt}"}
             ]
         else:
             # Auto mode: Use default behavior with few-shot examples
@@ -304,6 +305,31 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
                         
                         reply = result["choices"][0]["message"]["content"].strip()
                         logger.info(f"Generated reply: {reply[:100]}...")  # Log first 100 chars
+                        
+                        # Additional cleanup for custom prompts to remove any meta-text
+                        if use_custom_prompt and custom_prompt:
+                            # Remove common meta-text patterns
+                            meta_patterns = [
+                                "Here is your response:",
+                                "Here is the email:",
+                                "Here's the reply:",
+                                "Here's your email:",
+                                "Email body:",
+                                "Email reply:",
+                                "Response:",
+                                "Reply:",
+                            ]
+                            
+                            lines = reply.split('\n')
+                            cleaned_lines = []
+                            
+                            for line in lines:
+                                # Skip lines that are just meta-text
+                                if any(pattern in line for pattern in meta_patterns) and len(line.strip()) < 30:
+                                    continue
+                                cleaned_lines.append(line)
+                            
+                            reply = '\n'.join(cleaned_lines).strip()
                         
                         return {"reply": reply}
                         
