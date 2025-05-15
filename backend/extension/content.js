@@ -425,22 +425,82 @@ async function generateReply(emailContent) {
   const modal = modalElements.modal;
   const backdrop = modalElements.backdrop;
   
+  // Get the reply content div
+  const replyContent = document.getElementById("reply-content");
+  
+  // IMPORTANT: Clear any previous content and show loading immediately
+  replyContent.innerHTML = `
+    <div class="loading-state" style="
+      text-align: center;
+      padding: 40px 0;
+    ">
+      <div style="
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 24px;
+        position: relative;
+      ">
+        <div style="
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          border: 3px solid #f3f3f3;
+          border-radius: 50%;
+        "></div>
+        <div style="
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          border: 3px solid transparent;
+          border-top: 3px solid #1a73e8;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        "></div>
+      </div>
+      <h3 style="
+        margin: 0 0 8px 0;
+        font-family: 'Google Sans', Roboto, Arial, sans-serif;
+        font-size: 18px;
+        font-weight: 400;
+        color: #5f6368;
+      ">Crafting your reply...</h3>
+      <p style="
+        margin: 0;
+        color: #80868b;
+        font-size: 14px;
+      ">AI is analyzing the email and generating a professional response</p>
+      <p style="
+        margin: 16px 0 0 0;
+        color: #80868b;
+        font-size: 12px;
+      ">This may take a few seconds...</p>
+    </div>
+  `;
+  
+  // Reset opacity
+  replyContent.style.opacity = "1";
+  replyContent.classList.add("loading");
+  
   // Show modal with animation
   backdrop.style.display = "block";
   modal.style.display = "block";
   backdrop.style.animation = "fadeIn 0.3s ease-out";
   modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
   
-  const replyContent = document.getElementById("reply-content");
-  replyContent.classList.add("loading");
-  
   try {
+    // Prepare request body - removing email detection for now since it's causing issues
+    const requestBody = {
+      prompt: emailContent
+    };
+    
+    console.log("Sending request with:", requestBody);
+    
     const response = await fetch(`${BACKEND_URL}/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt: emailContent })
+      body: JSON.stringify(requestBody)
     });
     
     if (!response.ok) {
@@ -460,6 +520,9 @@ async function generateReply(emailContent) {
       replyContent.innerHTML = `<div style="white-space: pre-wrap;">${data.reply}</div>`;
       replyContent.style.transition = "opacity 0.3s ease-in";
       replyContent.style.opacity = "1";
+      
+      // Scroll to top of the reply content
+      replyContent.scrollTop = 0;
     }, 300);
     
   } catch (error) {
@@ -489,6 +552,15 @@ async function generateReply(emailContent) {
         ">Make sure your backend is running at ${BACKEND_URL}</p>
       </div>
     `;
+  }
+}
+
+// Add a function to clear modal content when navigating between emails
+function clearModalContent() {
+  const replyContent = document.getElementById("reply-content");
+  if (replyContent) {
+    replyContent.innerHTML = '';
+    replyContent.classList.remove("loading");
   }
 }
 
@@ -686,6 +758,10 @@ function checkAndInjectButton() {
   if (currentUrl !== window.location.href) {
     currentUrl = window.location.href;
     console.log("🔄 URL changed, checking for button injection...");
+    
+    // Clear modal content when navigating between emails
+    clearModalContent();
+    
     // Remove existing button if any
     const existingButton = document.getElementById(BUTTON_ID);
     if (existingButton) {
