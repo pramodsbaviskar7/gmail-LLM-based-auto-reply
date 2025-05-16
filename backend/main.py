@@ -441,6 +441,7 @@ async def get_config():
         logger.error(f"Config endpoint error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retrieve configuration: {str(e)}")
 
+from fastapi import FastAPI, HTTPException, Request, Response
 @app.head("/health")
 async def health_check_head():
     """Health check endpoint using HEAD method (lightweight version)"""
