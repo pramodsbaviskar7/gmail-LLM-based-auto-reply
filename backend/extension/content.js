@@ -2,7 +2,8 @@ console.log("✅ Gmail Auto LLM Reply: Content script loaded");
 
 const BUTTON_ID = "auto-reply-button";
 const MODAL_ID = "auto-reply-modal";
-const BACKEND_URL = "http://localhost:8000"; // Change to local for debugging
+// const BACKEND_URL = "http://localhost:8000"; // Change to local for debugging
+const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app"; // Updated to Vercel URL
 let checkInterval = null;
 let currentUrl = window.location.href;
 

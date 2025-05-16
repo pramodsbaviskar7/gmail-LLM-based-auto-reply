@@ -1,14 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "Gmail Auto LLM Reply",
+  "name": "RespondX",
   "version": "1.0",
-  "description": "Auto-generate Gmail replies using LLM via FastAPI",
+  "description": "Generate intelligent, personalized email responses in seconds with AI. Work smarter with Gmail's next evolution in communication.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "https://mail.google.com/*",
     "https://gmail-llm-based-auto-reply.vercel.app/*",
     "http://localhost:8000/*"
   ],
+  "icons": {
+    "16": "icon1.png",
+    "48": "icon1.png",
+    "128": "icon1.png"
+  },
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
@@ -17,6 +22,7 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": "icon1.png"
   }
 }
