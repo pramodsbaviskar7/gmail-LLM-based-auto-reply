@@ -441,23 +441,16 @@ async def get_config():
         logger.error(f"Config endpoint error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retrieve configuration: {str(e)}")
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint to verify server is running"""
+@app.head("/health")
+async def health_check_head():
+    """Health check endpoint using HEAD method (lightweight version)"""
     try:
-        logger.info("Health check requested")
-        return {
-            "status": "healthy",
-            "api_key_configured": bool(GROQ_API_KEY),
-            "api_key_preview": f"{GROQ_API_KEY[:10]}..." if GROQ_API_KEY else None,
-            "env_file_path": str(env_path),
-            "env_file_exists": env_path.exists(),
-            "config_imported": config_imported,
-            "current_user": USER_INFO['full_name']
-        }
+        logger.info("Health check HEAD requested")
+        return Response(status_code=200)
     except Exception as e:
-        logger.error(f"Health check error: {e}", exc_info=True)
+        logger.error(f"Health check HEAD error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
 
 @app.get("/")
 async def root():
