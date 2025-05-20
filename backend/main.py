@@ -208,8 +208,10 @@ async def generate_reply(request: Request):
         }
         user_identity = data.get("receiverEmail")
         print(user_identity)
-        if "pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity:
+
+        if user_identity and ("pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity):
             selected_user_info = USER_INFO
+
         else:
             
             selected_user_info = {
