@@ -2,7 +2,8 @@ console.log("✅ Gmail Auto LLM Reply: Content script loaded");
 
 const BUTTON_ID = "auto-reply-button";
 const MODAL_ID = "auto-reply-modal";
-const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
+const BACKEND_URL = "http://localhost:8000"; // Change to local for debugging
+// const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
 const FALLBACK_URL = "https://gmail-llm-based-auto-reply.onrender.com";
 let checkInterval = null;
 let currentUrl = window.location.href;
@@ -729,6 +730,127 @@ function createModal() {
   
   return { modal, backdrop };
 }
+
+/**
+ * Function to expand all collapsed parts of the email thread
+ */
+function expandEntireThread() {
+  // Find all "Show trimmed content" buttons and click them
+  const trimmedContentButtons = document.querySelectorAll('.ajz');
+  trimmedContentButtons.forEach(button => button.click());
+  
+  // Find all collapsed emails and expand them
+  const collapsedEmails = document.querySelectorAll('.h7');
+  collapsedEmails.forEach(email => {
+    const expandButton = email.querySelector('.ajR');
+    if (expandButton) {
+      expandButton.click();
+    }
+  });
+  
+  // Find "Show quoted text" buttons and click them
+  const quotedTextButtons = document.querySelectorAll('.ajU');
+  quotedTextButtons.forEach(button => button.click());
+  
+  // Find any "Show details" links or expandable sections
+  const detailsButtons = document.querySelectorAll('div[data-tooltip="Show details"], span.ajT');
+  detailsButtons.forEach(button => button.click());
+  
+  console.log("Thread expansion complete:", {
+    expandedTrimmedContent: trimmedContentButtons.length,
+    expandedEmails: collapsedEmails.length,
+    expandedQuotedText: quotedTextButtons.length
+  });
+}
+
+/**
+ * Function to extract the entire email thread/chain and log to console
+ */
+function extractEmailThread() {
+  console.log("Starting email thread extraction...");
+  
+  // First expand the entire thread
+  expandEntireThread();
+  
+  // Extract the subject line
+  const subjectElement = document.querySelector('h2[data-thread-perm-id]');
+  const subject = subjectElement ? subjectElement.textContent.trim() : "No subject found";
+  console.log("Email subject:", subject);
+  
+  // Get all email items in the thread
+  setTimeout(() => {
+    const allEmailItems = document.querySelectorAll('div[role="listitem"]');
+    console.log(`Found ${allEmailItems.length} emails in thread`);
+    
+    // Container for all thread data
+    const threadData = {
+      subject: subject,
+      emails: [],
+      completeThreadText: ""
+    };
+    
+    // Extract data from each email
+    allEmailItems.forEach((emailItem, index) => {
+      // Extract header information
+      const senderElement = emailItem.querySelector('span.gD');
+      const timestampElement = emailItem.querySelector('span.g3');
+      
+      // Extract the email content
+      const contentElement = emailItem.querySelector('div.a3s.aiL');
+      
+      let sender = senderElement ? (senderElement.getAttribute('email') || senderElement.textContent.trim()) : "Unknown sender";
+      let timestamp = timestampElement ? timestampElement.textContent.trim() : "Unknown time";
+      let content = contentElement ? contentElement.innerText.trim() : "No content found";
+      
+      // Add to the email array
+      threadData.emails.push({
+        index: index + 1,
+        sender,
+        timestamp,
+        contentPreview: content.substring(0, 100) + (content.length > 100 ? "..." : ""),
+        contentLength: content.length
+      });
+      
+      // Add to the complete thread text with separators
+      threadData.completeThreadText += `\n----- Email ${index + 1} from ${sender} (${timestamp}) -----\n\n${content}\n\n`;
+    });
+    
+    // Log the complete thread data
+    console.log("EMAIL THREAD DATA:", threadData);
+    console.log("COMPLETE THREAD TEXT:", threadData.completeThreadText);
+    
+    // Log thread stats
+    console.log("Thread Statistics:", {
+      totalEmails: threadData.emails.length,
+      totalThreadLength: threadData.completeThreadText.length,
+      averageEmailLength: threadData.emails.reduce((sum, email) => sum + email.contentLength, 0) / threadData.emails.length
+    });
+  }, 500); // Wait for expansions to complete
+}
+
+// Modify the button click handler to also extract and log the thread
+// Just add this inside the existing click handler without changing other functionality
+const originalButtonClickHandler = button.addEventListener;
+button.addEventListener = function(event, handler, options) {
+  if (event === "click") {
+    const enhancedHandler = async function(e) {
+      // Call the original handler first
+      handler.call(this, e);
+      
+      // After a brief delay, extract and log the thread
+      setTimeout(() => {
+        console.log("🔍 Extracting email thread for logging purposes...");
+        extractEmailThread();
+      }, 200);
+    };
+    
+    // Call the original addEventListener with our enhanced handler
+    originalButtonClickHandler.call(this, event, enhancedHandler, options);
+  } else {
+    // For other events, use the original behavior
+    originalButtonClickHandler.call(this, event, handler, options);
+  }
+};
 
 /**
  * Function to extract the receiver's email address from Gmail

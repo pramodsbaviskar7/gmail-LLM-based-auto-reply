@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RespondX",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Generate intelligent, personalized email responses in seconds with AI. Work smarter with Gmail's next evolution in communication.",
   "permissions": [],
   "host_permissions": [
