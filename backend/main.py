@@ -206,13 +206,34 @@ async def generate_reply(request: Request):
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
-        
-        # Signature template
-        signature_template = f"""{EMAIL_CONFIG['default_closing']},
-{USER_INFO['full_name']}
-{USER_INFO['email']}
-{USER_INFO['linkedin']}
-{USER_INFO['mobile']}"""
+        user_identity = data.get("receiverEmail")
+        print(user_identity)
+        if "pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity:
+            selected_user_info = USER_INFO
+        else:
+            
+            selected_user_info = {
+    "full_name": "Your Name",
+    "email": "your.email@company.com",
+    "linkedin": "https://www.linkedin.com/in/yourprofile",
+    "mobile": "+1 (555) 123-4567"
+}
+        import textwrap
+
+        signature_template = textwrap.dedent(f"""\
+    {EMAIL_CONFIG['default_closing']},
+    {selected_user_info['full_name']}
+    {selected_user_info['email']}
+    {selected_user_info['linkedin']}
+    {selected_user_info['mobile']}""")
+
+
+        # signature_template = f"""{EMAIL_CONFIG['default_closing']},
+        # {selected_user_info['full_name']}
+        # {selected_user_info['email']}
+        # {selected_user_info['linkedin']}
+        # {selected_user_info['mobile']}"""
+
 
         logger.info(f"Using signature template:\n{signature_template}")
 
@@ -240,8 +261,7 @@ Always end your replies with a professional signature in this exact format:
 
 {signature_template}
 
-Important: Use this exact signature information in all replies. The name is {USER_INFO['full_name']}, email is {USER_INFO['email']}, LinkedIn is {USER_INFO['linkedin']}, and mobile is {USER_INFO['mobile']}."""
-
+Important: Use this exact signature information in all replies. The name is {selected_user_info['full_name']}, email is {selected_user_info['email']}, LinkedIn is {selected_user_info['linkedin']}, and mobile is {selected_user_info['mobile']}."""
             few_shot_examples = [
                 {
                     "role": "user",

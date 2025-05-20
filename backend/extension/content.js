@@ -730,6 +730,45 @@ function createModal() {
   return { modal, backdrop };
 }
 
+/**
+ * Function to extract the receiver's email address from Gmail
+ * This works in both scenarios:
+ * 1. When viewing a received email (extracts your email)
+ * 2. When viewing a sent email (extracts the recipient's email)
+ */
+function extractReceiverEmail() {
+  // Method A: Check Gmail's recipient span (typically for sent mail)
+  const recipientSpan = document.querySelector('span.g2[email]');
+  if (recipientSpan) {
+    return recipientSpan.getAttribute('email');
+  }
+
+  // Method B: Look through all span[email] elements and filter likely recipient
+  const emailElements = document.querySelectorAll('span[email]');
+  for (const el of emailElements) {
+    const email = el.getAttribute('email');
+    const name = el.getAttribute('name') || el.textContent.trim();
+    if (email && name !== email) {
+      return email; // Likely recipient
+    }
+  }
+
+  // Method C: Fallback - Look for mailto links in the email header
+  const mailtoLinks = document.querySelectorAll('a[href^="mailto:"]');
+  for (const link of mailtoLinks) {
+    const href = link.getAttribute('href');
+    const emailMatch = href.match(/^mailto:([^?]+)/);
+    if (emailMatch) {
+      return emailMatch[1];
+    }
+  }
+
+  // Nothing found
+  return null;
+}
+
+
+
 // Function to insert reply into Gmail compose box
 function insertReplyIntoGmail(replyText) {
   // Click the reply button to open compose area
@@ -880,8 +919,8 @@ if (!document.head.querySelector('style[data-slidedown]')) {
   document.head.appendChild(slideDownStyle);
 }
 
-// Function to generate reply using the backend
-async function generateReply(emailContent) {
+// Update generateReply to accept receiver email
+async function generateReply(emailContent, receiverEmail) {
   const modalElements = createModal();
   const modal = modalElements.modal;
   const backdrop = modalElements.backdrop;
@@ -897,6 +936,20 @@ async function generateReply(emailContent) {
   backdrop.style.animation = "fadeIn 0.3s ease-out";
   modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
   
+  // Add receiver email to the modal header if available
+  const modalHeader = modal.querySelector('h2');
+  if (modalHeader && receiverEmail) {
+    const emailInfo = document.createElement('p');
+    emailInfo.style.cssText = `
+      margin: 4px 0 0 0;
+      font-family: Roboto, Arial, sans-serif;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 12px;
+    `;
+    emailInfo.textContent = `Replying to: ${receiverEmail}`;
+    // modalHeader.insertAdjacentElement('afterend', emailInfo);
+  }
+  
   // If custom mode is enabled, just show the UI and wait for user input
   if (customModeSwitch && customModeSwitch.checked) {
     replyContent.style.display = "none";
@@ -905,11 +958,12 @@ async function generateReply(emailContent) {
   
   // Otherwise, generate reply automatically
   replyContent.style.display = "block";
-  generateReplyContent(emailContent, false, null);
+  generateReplyContent(emailContent, false, null, receiverEmail);
 }
 
-// Helper function to generate reply content
-async function generateReplyContent(emailContent, useCustomPrompt, customPrompt) {
+
+// Update the generateReplyContent function to accept and use the recipient email
+async function generateReplyContent(emailContent, useCustomPrompt, customPrompt, receiverEmail) {
   const replyContent = document.getElementById("reply-content");
   
   // Show loading state
@@ -958,19 +1012,20 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt)
         color: #80868b;
         font-size: 12px;
       ">This may take a few seconds...</p>
+      ${receiverEmail ? `<p style="margin: 8px 0 0 0; color: #1a73e8; font-size: 12px;">Replying to: ${receiverEmail}</p>` : ''}
     </div>
   `;
   
   replyContent.style.opacity = "1";
   replyContent.classList.add("loading");
   
-  // Prepare request body based on mode
   const requestBody = {
     prompt: emailContent,
-    useCustomPrompt: Boolean(useCustomPrompt),  // Ensure boolean
-    customPrompt: customPrompt || ""  // Send empty string instead of null
+    useCustomPrompt: Boolean(useCustomPrompt),
+    customPrompt: customPrompt || "",
+    receiverEmail: receiverEmail || "" // Include receiver email if available
   };
-  
+
   // Define primary and fallback API endpoints
   const PRIMARY_API = `${BACKEND_URL}/generate`;
   const FALLBACK_API = `${FALLBACK_URL}/generate`;
@@ -1321,11 +1376,20 @@ function injectButton() {
     document.head.appendChild(sparkleStyle);
   }
   
-  // Make the button clickable
+// Make the button clickable
   button.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
     console.log("🚀 Auto-Reply button clicked!");
+    
+    // Extract receiver's email address
+    const receiverEmail = extractReceiverEmail();
+    console.log("📧 Receiver's email:", receiverEmail);
+    
+    // Store for later use
+    if (receiverEmail) {
+      sessionStorage.setItem('receiver_email', receiverEmail);
+    }
     
     // Get the email content
     const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
@@ -1333,8 +1397,8 @@ function injectButton() {
       const emailText = emailContent.innerText;
       console.log("📧 Email content found:", emailText.substring(0, 100) + "...");
       
-      // Generate reply using backend
-      await generateReply(emailText);
+      // Generate reply using backend (now with receiver email)
+      await generateReply(emailText, receiverEmail);
     } else {
       alert("Could not find email content. Please make sure you're viewing an email.");
     }
