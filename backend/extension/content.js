@@ -830,27 +830,33 @@ function extractEmailThread() {
 
 // Modify the button click handler to also extract and log the thread
 // Just add this inside the existing click handler without changing other functionality
-const originalButtonClickHandler = button.addEventListener;
-button.addEventListener = function(event, handler, options) {
-  if (event === "click") {
-    const enhancedHandler = async function(e) {
-      // Call the original handler first
-      handler.call(this, e);
-      
-      // After a brief delay, extract and log the thread
-      setTimeout(() => {
-        console.log("🔍 Extracting email thread for logging purposes...");
-        extractEmailThread();
-      }, 200);
+// Add this function definition somewhere in your code
+function modifyButtonClickHandler() {
+  const button = document.getElementById(BUTTON_ID);
+  if (button) {
+    const originalButtonClickHandler = button.addEventListener;
+    button.addEventListener = function(event, handler, options) {
+      if (event === "click") {
+        const enhancedHandler = async function(e) {
+          // Call the original handler first
+          handler.call(this, e);
+          
+          // After a brief delay, extract and log the thread
+          setTimeout(() => {
+            console.log("🔍 Extracting email thread for logging purposes...");
+            extractEmailThread();
+          }, 200);
+        };
+        
+        // Call the original addEventListener with our enhanced handler
+        originalButtonClickHandler.call(this, event, enhancedHandler, options);
+      } else {
+        // For other events, use the original behavior
+        originalButtonClickHandler.call(this, event, handler, options);
+      }
     };
-    
-    // Call the original addEventListener with our enhanced handler
-    originalButtonClickHandler.call(this, event, enhancedHandler, options);
-  } else {
-    // For other events, use the original behavior
-    originalButtonClickHandler.call(this, event, handler, options);
   }
-};
+}
 
 /**
  * Function to extract the receiver's email address from Gmail
@@ -1498,7 +1504,7 @@ function injectButton() {
     document.head.appendChild(sparkleStyle);
   }
   
-// Make the button clickable
+  // Make the button clickable
   button.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1537,6 +1543,37 @@ function injectButton() {
   buttonWrapper.appendChild(button);
   toolbar.appendChild(buttonWrapper);
   console.log("✅ Auto-Reply button injected successfully");
+  
+  // Apply the click handler modification after the button is injected
+  modifyButtonClickHandler();
+}
+
+// New function to safely modify the button's click handler
+function modifyButtonClickHandler() {
+  const button = document.getElementById(BUTTON_ID);
+  if (button) {
+    const originalButtonClickHandler = button.addEventListener;
+    button.addEventListener = function(event, handler, options) {
+      if (event === "click") {
+        const enhancedHandler = async function(e) {
+          // Call the original handler first
+          handler.call(this, e);
+          
+          // After a brief delay, extract and log the thread
+          setTimeout(() => {
+            console.log("🔍 Extracting email thread for logging purposes...");
+            extractEmailThread();
+          }, 200);
+        };
+        
+        // Call the original addEventListener with our enhanced handler
+        originalButtonClickHandler.call(this, event, enhancedHandler, options);
+      } else {
+        // For other events, use the original behavior
+        originalButtonClickHandler.call(this, event, handler, options);
+      }
+    };
+  }
 }
 
 // Function to check and inject button
