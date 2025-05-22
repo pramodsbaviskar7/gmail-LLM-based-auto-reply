@@ -47,6 +47,7 @@ function clearCacheOnNavigation() {
 clearCacheOnNavigation();
 
 // Function to create the modal for auto-reply
+// Function to create the modal for auto-reply
 function createModal() {
   // Check if modal already exists
   if (document.getElementById(MODAL_ID)) {
@@ -141,110 +142,58 @@ function createModal() {
           </p>
         </div>
       </div>
-      <button id="close-modal" style="
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        cursor: pointer;
-        color: white;
-        font-size: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
-      ">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
-      </button>
+      
+      <!-- Right side buttons -->
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <!-- Summary Toggle Button -->
+        <button id="summary-toggle-btn" style="
+ background: rgba(255, 255, 255, 0.15);
+ border: 1px solid rgba(255, 255, 255, 0.3);
+ padding: 8px 12px;
+ border-radius: 20px;
+ color: white;
+ font-family: Roboto, Arial, sans-serif;
+ font-size: 12px;
+ font-weight: bold;
+ cursor: pointer;
+ transition: all 0.3s ease;
+ display: flex;
+ align-items: center;
+ gap: 6px;
+">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+   <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+ </svg>
+ Check Email Summary
+</button>
+        
+        <!-- Close Button -->
+        <button id="close-modal" style="
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          cursor: pointer;
+          color: white;
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
     </div>
     
     <div style="
       padding: 32px;
       max-height: calc(85vh - 180px);
       overflow-y: auto;
-    ">
-    <!-- Thread Summary Section - Properly Aligned -->
-<div id="thread-summary-toggle" style="
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e8eaed;
-">
-  <div style="
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  ">
-    <div style="flex: 1;">
-      <h3 style="
-        margin: 0 0 2px 0;
-        font-family: 'Google Sans', Roboto, Arial, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        color: #202124;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      ">
-        📊 Email Thread Summary
-      </h3>
-      <p style="
-        margin: 0;
-        font-size: 12px;
-        color: #5f6368;
-        line-height: 1.3;
-      ">AI-generated conversation analysis</p>
-    </div>
-    
-    <!-- Properly aligned toggle switch -->
-    <label class="toggle-switch" style="
-      position: relative;
-      display: inline-block;
-      width: 44px;
-      height: 24px;
-      margin-left: 16px;
-      flex-shrink: 0;
-    ">
-      <input type="checkbox" id="summary-mode-switch" style="
-        opacity: 0;
-        width: 0;
-        height: 0;
-      ">
-      <span class="slider round" style="
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        transition: .3s;
-        border-radius: 24px;
-      "></span>
-    </label>
-  </div>
-  
-  <div id="thread-summary-section" style="display: none; margin-top: 12px;">
-    <div id="summary-content" style="
-      background: white;
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid #dadce0;
-      font-family: Roboto, Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.4;
-      color: #202124;
-      max-height: 250px;
-      overflow-y: auto;
-    ">
-      <!-- Summary content will be loaded here -->
-    </div>
-  </div>
-</div>
+    " id="modal-scroll-container">
   
       <!-- Custom Reply Mode - Properly Aligned -->
 <div id="custom-prompt-toggle" style="
@@ -454,6 +403,7 @@ function createModal() {
         gap: 16px;
         justify-content: flex-end;
         padding-top: 8px;
+        margin-bottom: 24px;
       ">
         <button id="copy-reply" style="
           padding: 12px 24px;
@@ -517,6 +467,46 @@ function createModal() {
           </svg>
           Direct Reply
         </button>
+      </div>
+      
+      <!-- Email Summary Section - Shows at bottom when enabled -->
+      <div id="thread-summary-section" style="
+        display: none;
+        margin-top: 8px;
+        padding: 20px;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8eaed;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+        ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#1a73e8">
+            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+          </svg>
+          <h4 style="
+            margin: 0;
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            font-size: 16px;
+            font-weight: 500;
+            color: #202124;
+          ">Email Thread Summary</h4>
+        </div>
+        
+        <div id="summary-content" style="
+          font-family: Roboto, Arial, sans-serif;
+          font-size: 14px;
+          line-height: 1.5;
+          color: #202124;
+          max-height: 300px;
+          overflow-y: auto;
+        ">
+          <!-- Summary content will be loaded here -->
+        </div>
       </div>
     </div>
     
@@ -628,6 +618,26 @@ function createModal() {
 .toggle-switch input:checked + .slider:hover {
   background-color: #2d8f47;
 }
+
+      /* Summary button styles */
+      #summary-toggle-btn:hover {
+        background: rgba(255, 255, 255, 0.25) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      }
+      
+      #summary-toggle-btn.active {
+        background: rgba(255, 255, 255, 0.35) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+        transform: translateY(-1px);
+      }
+      
+      #summary-toggle-btn.active svg {
+        filter: brightness(1.2);
+      }
+      
       /* Preset button styles */
       .preset-btn:hover {
         transform: translateY(-1px);
@@ -638,46 +648,6 @@ function createModal() {
       .preset-btn[style*="#e8f0fe"]:hover {
         background: #d2e3fc !important;
         border-color: #a8c7fa !important;
-      }
-      
-      /* Green buttons (acceptance) */
-      .preset-btn[style*="#e6f4ea"]:hover {
-        background: #c8e6c9 !important;
-        border-color: #a5d6a7 !important;
-      }
-      
-      /* Yellow buttons (information) */
-      .preset-btn[style*="#fef7e0"]:hover {
-        background: #feeaa7 !important;
-        border-color: #fdcc80 !important;
-      }
-      
-      /* Purple buttons (acknowledgment) */
-      .preset-btn[style*="#f3e8ff"]:hover {
-        background: #e0b3ff !important;
-        border-color: #d092ff !important;
-      }
-      
-      /* Dark green buttons (business) */
-      .preset-btn[style*="#e8f5e8"]:hover {
-        background: #c8e6c9 !important;
-        border-color: #a5d6a7 !important;
-      }
-      
-      /* Pink buttons (deadline) */
-      .preset-btn[style*="#fce4ec"]:hover {
-        background: #f8bbd0 !important;
-        border-color: #f48fb1 !important;
-      }
-      
-      /* Light blue buttons (feedback) */
-      .preset-btn[style*="#e3f2fd"]:hover {
-        background: #bbdefb !important;
-        border-color: #90caf9 !important;
-      }
-      
-      .preset-btn:active {
-        transform: scale(0.98);
       }
       
       /* Generate button styles */
@@ -698,21 +668,25 @@ function createModal() {
       }
       
       /* Scrollbar styling */
-      #reply-content::-webkit-scrollbar {
+      #reply-content::-webkit-scrollbar,
+      #summary-content::-webkit-scrollbar {
         width: 8px;
       }
       
-      #reply-content::-webkit-scrollbar-track {
+      #reply-content::-webkit-scrollbar-track,
+      #summary-content::-webkit-scrollbar-track {
         background: #f1f3f4;
         border-radius: 4px;
       }
       
-      #reply-content::-webkit-scrollbar-thumb {
+      #reply-content::-webkit-scrollbar-thumb,
+      #summary-content::-webkit-scrollbar-thumb {
         background: #dadce0;
         border-radius: 4px;
       }
       
-      #reply-content::-webkit-scrollbar-thumb:hover {
+      #reply-content::-webkit-scrollbar-thumb:hover,
+      #summary-content::-webkit-scrollbar-thumb:hover {
         background: #bdc1c6;
       }
       
@@ -775,6 +749,7 @@ function createModal() {
        }, 200);
      });
    });
+   
   // Add event listener for Generate Reply button
   const generateButton = document.getElementById("generate-custom-reply");
   if (generateButton) {
@@ -796,98 +771,118 @@ function createModal() {
     });
   }
   
-// Add event listeners for summary toggle with caching
-const summaryToggleSwitch = document.getElementById("summary-mode-switch");
-const threadSummarySection = document.getElementById("thread-summary-section");
-const summaryContent = document.getElementById("summary-content");
+  // Header Summary Button - Generate and show summary data
+  const summaryToggleBtn = document.getElementById("summary-toggle-btn");
+  const threadSummarySection = document.getElementById("thread-summary-section");
+  const summaryContent = document.getElementById("summary-content");
+  let summaryEnabled = false;
 
-if (summaryToggleSwitch) {
-  summaryToggleSwitch.addEventListener("change", async (e) => {
-    threadSummarySection.style.display = e.target.checked ? "block" : "none";
-    
-    if (e.target.checked) {
-      const cacheKey = `summary_${generateCacheKey()}`;
+  if (summaryToggleBtn) {
+    summaryToggleBtn.addEventListener("click", async () => {
+      summaryEnabled = !summaryEnabled;
       
-      // Check if we already have a cached summary for this thread
-      if (responseCache.has(cacheKey)) {
-        console.log("📄 Using cached summary");
-        const cachedSummary = responseCache.get(cacheKey);
+      if (summaryEnabled) {
+        summaryToggleBtn.classList.add("active");
+        threadSummarySection.style.display = "block";
         
-        // Add a small indicator that it's cached
+        // Scroll to summary section with smooth animation
+        const scrollContainer = document.getElementById("modal-scroll-container");
+        if (scrollContainer) {
+          setTimeout(() => {
+            const targetScrollTop = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+            const startScrollTop = scrollContainer.scrollTop;
+            const distance = targetScrollTop - startScrollTop;
+            const duration = 800; // 800ms for smooth scroll
+            let startTime = null;
+            
+            function smoothScroll(currentTime) {
+              if (startTime === null) startTime = currentTime;
+              const timeElapsed = currentTime - startTime;
+              const progress = Math.min(timeElapsed / duration, 1);
+              
+              // Easing function for smooth animation
+              const easeInOutCubic = progress < 0.5 
+                ? 4 * progress * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+              
+              scrollContainer.scrollTop = startScrollTop + (distance * easeInOutCubic);
+              
+              if (progress < 1) {
+                requestAnimationFrame(smoothScroll);
+              }
+            }
+            
+            requestAnimationFrame(smoothScroll);
+          }, 150);
+        }
+        
+        // Check cache first
+        const cacheKey = `summary_${generateCacheKey()}`;
+        
+        if (responseCache.has(cacheKey)) {
+          console.log("📄 Using cached summary");
+          const cachedSummary = responseCache.get(cacheKey);
+          displayThreadSummary(summaryContent, cachedSummary);
+          return;
+        }
+        
+        // Show loading and generate summary
+        console.log("🔄 Generating new summary");
         summaryContent.innerHTML = `
-          <div style="
-            position: relative;
-            border: 1px solid #e8eaed;
-            border-radius: 8px;
-            background: #f8f9fa;
-            margin-bottom: 12px;
-          ">
-            <div style="
-              position: absolute;
-              top: 8px;
-              right: 12px;
-              background: #34a853;
-              color: white;
-              padding: 2px 8px;
-              border-radius: 12px;
-              font-size: 11px;
-              font-weight: 500;
-            ">CACHED</div>
-            <div style="padding: 16px;">
+          <div class="summary-loading" style="text-align: center; padding: 20px 0;">
+            <div style="width: 32px; height: 32px; margin: 0 auto 12px; position: relative;">
+              <div style="position: absolute; width: 100%; height: 100%; border: 2px solid #f3f3f3; border-radius: 50%;"></div>
+              <div style="position: absolute; width: 100%; height: 100%; border: 2px solid transparent; border-top: 2px solid #1a73e8; border-radius: 50%; animation: spin 1s linear infinite;"></div>
             </div>
+            <p style="margin: 0; color: #5f6368; font-size: 13px;">Analyzing conversation...</p>
           </div>
         `;
         
-        displayThreadSummary(summaryContent, cachedSummary);
-        return;
-      }
-      
-      // If not cached, show loading and make API call
-      console.log("🔄 Generating new summary");
-      summaryContent.innerHTML = `
-        <div class="summary-loading" style="text-align: center; padding: 20px 0;">
-          <div style="width: 40px; height: 40px; margin: 0 auto 16px; position: relative;">
-            <div style="position: absolute; width: 100%; height: 100%; border: 3px solid #f3f3f3; border-radius: 50%;"></div>
-            <div style="position: absolute; width: 100%; height: 100%; border: 3px solid transparent; border-top: 3px solid #1a73e8; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-          </div>
-          <p style="margin: 0; color: #5f6368; font-size: 14px;">Analyzing conversation history...</p>
-        </div>
-      `;
-      
-      try {
-        const threadData = await extractEmailThread();
-        const analysisResult = await analyzeEmailThread(threadData);
-        
-        // Extract the analysis data from the nested structure
-        const analysisData = analysisResult.analysis || analysisResult;
-        
-        if (analysisData && analysisData.summary) {
-          // Cache the analysis data
-          responseCache.set(cacheKey, analysisData);
-          console.log("💾 Cached summary data");
+        try {
+          const threadData = await extractEmailThread();
+          const analysisResult = await analyzeEmailThread(threadData);
+          const analysisData = analysisResult.analysis || analysisResult;
           
-          displayThreadSummary(summaryContent, analysisData);
-        } else {
+          if (analysisData && analysisData.summary) {
+            responseCache.set(cacheKey, analysisData);
+            console.log("💾 Cached summary data");
+            displayThreadSummary(summaryContent, analysisData);
+          } else {
+            summaryContent.innerHTML = `
+              <div style="text-align: center; padding: 16px;">
+                <p style="margin: 0; color: #5f6368; font-size: 13px;">No analysis data found.</p>
+              </div>
+            `;
+          }
+          
+        } catch (error) {
+          console.error("Error:", error);
           summaryContent.innerHTML = `
-            <div style="text-align: center; padding: 20px;">
-              <p style="margin: 0; color: #5f6368; font-size: 14px;">No analysis data found.</p>
+            <div style="text-align: center; padding: 16px;">
+              <p style="margin: 0; color: #ea4335; font-size: 13px;">Error: ${error.message}</p>
             </div>
           `;
         }
         
-      } catch (error) {
-        console.error("Error:", error);
-        summaryContent.innerHTML = `
-          <div style="text-align: center; padding: 20px;">
-            <p style="margin: 0; color: #ea4335; font-size: 14px;">Error: ${error.message}</p>
-          </div>
-        `;
+      } else {
+        summaryToggleBtn.classList.remove("active");
+        threadSummarySection.style.display = "none";
+        
+        // Scroll back to top with smooth animation
+        const scrollContainer = document.getElementById("modal-scroll-container");
+        if (scrollContainer) {
+          setTimeout(() => {
+            scrollContainer.scrollTo({
+              top: 0,
+              behavior: 'smooth'
+            });
+          }, 100);
+        }
       }
-    }
-  });
-}
+    });
+  }
 
-  // Add event listeners
+  // Add event listeners for modal close
   backdrop.addEventListener("click", () => {
     backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
     modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
@@ -907,73 +902,74 @@ if (summaryToggleSwitch) {
   });
   
   document.getElementById("copy-reply").addEventListener("click", () => {
-  // Get text from the actual reply content, excluding HTML structure
-  const replyTextElement = document.getElementById("cached-reply-text") || 
-                          document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
-                          document.getElementById("reply-content");
-  
-  const replyText = replyTextElement.innerText || replyTextElement.textContent;
-  
-  navigator.clipboard.writeText(replyText).then(() => {
-    // Show success feedback
-    const button = document.getElementById("copy-reply");
-    const originalContent = button.innerHTML;
-    button.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="success-icon">
-        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-      </svg>
-      Copied!
-    `;
-    button.style.color = "#34a853";
+    // Get text from the actual reply content, excluding HTML structure
+    const replyTextElement = document.getElementById("cached-reply-text") || 
+                            document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
+                            document.getElementById("reply-content");
     
-    setTimeout(() => {
-      button.innerHTML = originalContent;
-      button.style.color = "#1a73e8";
-    }, 2000);
+    const replyText = replyTextElement.innerText || replyTextElement.textContent;
+    
+    navigator.clipboard.writeText(replyText).then(() => {
+      // Show success feedback
+      const button = document.getElementById("copy-reply");
+      const originalContent = button.innerHTML;
+      button.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="success-icon">
+          <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+        </svg>
+        Copied!
+      `;
+      button.style.color = "#34a853";
+      
+      setTimeout(() => {
+        button.innerHTML = originalContent;
+        button.style.color = "#1a73e8";
+      }, 2000);
+    });
   });
-});
 
-document.getElementById("insert-reply").addEventListener("click", () => {
-  // Get only the reply text, not the HTML structure
-  const replyTextElement = document.getElementById("cached-reply-text") || 
-                          document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
-                          document.getElementById("reply-content");
-  
-  const replyText = replyTextElement.innerText || replyTextElement.textContent;
-  
-  insertReplyIntoGmail(replyText);
-  
-  // Close modal with animation
-  const backdrop = document.getElementById("modal-backdrop");
-  const modal = document.getElementById(MODAL_ID);
-  backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
-  modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
-  setTimeout(() => {
-    backdrop.style.display = "none";
-    modal.style.display = "none";
-  }, 300);
-});
+  document.getElementById("insert-reply").addEventListener("click", () => {
+    // Get only the reply text, not the HTML structure
+    const replyTextElement = document.getElementById("cached-reply-text") || 
+                            document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
+                            document.getElementById("reply-content");
+    
+    const replyText = replyTextElement.innerText || replyTextElement.textContent;
+    
+    insertReplyIntoGmail(replyText);
+    
+    // Close modal with animation
+    const backdrop = document.getElementById("modal-backdrop");
+    const modal = document.getElementById(MODAL_ID);
+    backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
+    modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
+    setTimeout(() => {
+      backdrop.style.display = "none";
+      modal.style.display = "none";
+    }, 300);
+  });
 
-document.getElementById("direct-reply").addEventListener("click", () => {
-  // Get only the reply text, not the HTML structure
-  const replyTextElement = document.getElementById("cached-reply-text") || 
-                          document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
-                          document.getElementById("reply-content");
+  document.getElementById("direct-reply").addEventListener("click", () => {
+    // Get only the reply text, not the HTML structure
+    const replyTextElement = document.getElementById("cached-reply-text") || 
+                            document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
+                            document.getElementById("reply-content");
+    
+    const replyText = replyTextElement.innerText || replyTextElement.textContent;
+    
+    directReplyEmail(replyText);
+    
+    // Close modal with animation
+    const backdrop = document.getElementById("modal-backdrop");
+    const modal = document.getElementById(MODAL_ID);
+    backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
+    modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
+    setTimeout(() => {
+      backdrop.style.display = "none";
+      modal.style.display = "none";
+    }, 300);
+  });
   
-  const replyText = replyTextElement.innerText || replyTextElement.textContent;
-  
-  directReplyEmail(replyText);
-  
-  // Close modal with animation
-  const backdrop = document.getElementById("modal-backdrop");
-  const modal = document.getElementById(MODAL_ID);
-  backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
-  modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
-  setTimeout(() => {
-    backdrop.style.display = "none";
-    modal.style.display = "none";
-  }, 300);
-});
   // Add closing animations
   const style = document.createElement("style");
   style.textContent = `
@@ -997,7 +993,6 @@ document.getElementById("direct-reply").addEventListener("click", () => {
   
   return { modal, backdrop };
 }
-
 /**
  * Enhanced function to expand all collapsed parts of the email thread
  */
