@@ -227,7 +227,7 @@ Your output must:
 - Exclude notes like "Here is your JSON", "Here’s the result:", "```json", or trailing dots (...).
 
 Instructions:
-1. Provide a clear and informative "summary" of the entire email conversation, covering key points, decisions, requests, and outcomes. The summary should be at least 3–5 sentences long and capture the main intent and progression of the conversation.
+1. Generate a detailed summary that captures the entire conversation flow, including sender intentions, replies, tone, and outcomes. Include who said what, how the message was received, and the final result. The summary should be at least 5–7 sentences long.
 2. Perform "sentiment_analysis" of the thread (e.g., positive, negative, neutral), and highlight tone shifts if any.
 3. Perform "topic modeling" to extract main topics and subtopics.
 4. Extract all "named_entities", including:
@@ -286,6 +286,9 @@ Do not include any additional content.
             {"role": "system", "content": analysis_prompt},
             {"role": "user", "content": f"Email Thread:\n{email_chain}"}
         ]
+        
+        logger.info(f"analysis_prompt: {email_chain}")
+
 
         payload = {
             "messages": messages,
