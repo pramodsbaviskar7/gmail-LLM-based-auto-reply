@@ -9,6 +9,15 @@ import aiohttp
 from dotenv import load_dotenv
 import json
 import asyncio
+import json
+import logging
+import aiohttp
+import asyncio
+import tiktoken
+from fastapi import APIRouter, Request, HTTPException
+from config import MODEL_CONFIG
+import json
+import re
 
 # Configure logging first
 logging.basicConfig(
@@ -169,6 +178,190 @@ async def startup_event():
     logger.info("FastAPI server started successfully")
     logger.info(f"Server running with Groq API key: {GROQ_API_KEY[:10]}...")
     logger.info(f"Using configuration for: {USER_INFO['full_name']} ({USER_INFO['email']})")
+
+
+
+MAX_TOKENS = MODEL_CONFIG.get("max_tokens", 32000)  # Safe max limit for mixtral or similar
+
+def count_tokens(text: str, model: str = "gpt-3.5-turbo") -> int:
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
+    return len(enc.encode(text))
+
+def truncate_to_limit(text: str, token_limit: int, model: str = "gpt-3.5-turbo") -> str:
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
+
+    if not isinstance(text, str):
+        raise ValueError(f"Expected string input for truncation but got {type(text).__name__}")
+
+    tokens = enc.encode(text)
+    return enc.decode(tokens[-token_limit:])  # Keep last tokens for latest context
+
+@app.post("/analyze-thread")
+async def analyze_email_thread(request: Request):
+    try:
+        try:
+            data = await request.json()
+            logger.info(f"Raw request data: {data}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse request JSON: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in request: {str(e)}")
+
+        email_chain = data.get("thread", {}).get("completeThreadText", "")
+        auto_truncate = data.get("autoTruncate", True)
+
+        if not email_chain:
+            logger.error("Empty email chain received")
+            raise HTTPException(status_code=400, detail="Email chain cannot be empty")
+        analysis_prompt = """
+You are an AI email analyst. Analyze the following email thread and respond with **only** a strict, valid JSON object.
+
+Your output must:
+- Begin directly with '{' and end with '}'.
+- Contain **no extra characters** outside the JSON.
+- Include **no explanations**, **no headings**, and **no markdown formatting**.
+- Exclude notes like "Here is your JSON", "Here’s the result:", "```json", or trailing dots (...).
+
+Instructions:
+1. Provide a clear and informative "summary" of the entire email conversation, covering key points, decisions, requests, and outcomes. The summary should be at least 3–5 sentences long and capture the main intent and progression of the conversation.
+2. Perform "sentiment_analysis" of the thread (e.g., positive, negative, neutral), and highlight tone shifts if any.
+3. Perform "topic modeling" to extract main topics and subtopics.
+4. Extract all "named_entities", including:
+   - People
+   - Companies
+   - Dates (with context)
+   - Mobile numbers
+   - Email addresses
+   - Locations
+
+Return a single valid JSON object with this structure:
+{
+  "summary": string,
+  "sentiment_analysis": {
+    "overall": string,
+    "tone_shifts": list
+  },
+  "topics": {
+    "main": [
+      {
+        "label": string,
+        "subtopics": list
+      }
+    ]
+  },
+  "named_entities": {
+    "people": list,
+    "companies": list,
+    "dates": list,
+    "mobile_numbers": list,
+    "email_addresses": list,
+    "locations": list
+  }
+}
+Do not include any additional content.
+"""
+
+        prompt_model = MODEL_CONFIG["model"]
+        total_input = f"{analysis_prompt}\n\nEmail Thread:\n{email_chain}"
+        token_count = count_tokens(total_input, prompt_model)
+
+        logger.info(f"Total token count: {token_count} for model {prompt_model}")
+
+        if token_count > MAX_TOKENS:
+            if auto_truncate:
+                logger.warning(f"Input too long ({token_count} tokens). Truncating to fit within {MAX_TOKENS}.")
+                safe_limit = MAX_TOKENS - count_tokens(analysis_prompt, prompt_model)
+                email_chain = truncate_to_limit(email_chain, safe_limit, prompt_model)
+            else:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Input exceeds token limit ({token_count} > {MAX_TOKENS}). Set autoTruncate=True to truncate automatically."
+                )
+
+        messages = [
+            {"role": "system", "content": analysis_prompt},
+            {"role": "user", "content": f"Email Thread:\n{email_chain}"}
+        ]
+
+        payload = {
+            "messages": messages,
+            "model": prompt_model,
+            "temperature": 0.4,
+            "max_tokens": 1500
+        }
+
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        logger.info("Sending email analysis request to Groq API")
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=40)
+                ) as resp:
+                    response_text = await resp.text()
+                    logger.debug(f"Groq response: {response_text[:500]}")
+
+                    if resp.status != 200:
+                        try:
+                            error_data = json.loads(response_text)
+                            error_message = error_data.get("error", {}).get("message", "Unknown error")
+                        except json.JSONDecodeError:
+                            error_message = response_text
+                        raise GroqAPIError(resp.status, error_message)
+
+                    try:
+                        result = json.loads(response_text)
+                        
+                        analysis_str = result["choices"][0]["message"]["content"].strip()
+
+                        try:
+                            # Find the first complete JSON object (greedy match to last closing brace)
+                            json_match = re.search(r'{.*}', analysis_str, re.DOTALL)
+                            if not json_match:
+                                raise ValueError("No valid JSON object found in response.")
+
+                            json_str = json_match.group(0).rstrip(' .')  # Remove trailing dots or spaces
+                            analysis_dict = json.loads(json_str)
+                            logger.info(f"analysis: {analysis_dict}")
+                            logger.info(f"type analysis: {type(analysis_dict)}")
+
+                            return {"analysis": analysis_dict}
+
+                        except json.JSONDecodeError as e:
+                            logger.error(f"JSON decode error: {e}")
+                            raise HTTPException(status_code=500, detail=f"Failed to parse valid JSON from model response.")
+                        except Exception as e:
+                            logger.error(f"Unexpected error while parsing JSON: {e}")
+                            raise HTTPException(status_code=500, detail="Unexpected error parsing model output.")
+
+                    except json.JSONDecodeError as e:
+                        raise HTTPException(status_code=500, detail=f"Failed to parse Groq API response: {str(e)}")
+
+            except aiohttp.ClientError as e:
+                raise HTTPException(status_code=503, detail=f"Network error: {str(e)}")
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=504, detail="Groq API request timed out")
+
+    except GroqAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=f"Groq API error: {e.message}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 
 @app.post("/generate")
 async def generate_reply(request: Request):
