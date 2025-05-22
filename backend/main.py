@@ -15,7 +15,6 @@ import aiohttp
 import asyncio
 import tiktoken
 from fastapi import APIRouter, Request, HTTPException
-from config import MODEL_CONFIG
 import json
 import re
 
