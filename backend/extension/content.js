@@ -485,9 +485,10 @@ function createModal() {
           gap: 8px;
           margin-bottom: 16px;
         ">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="#1a73e8">
-            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-          </svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+</svg>
+
           <h4 style="
             margin: 0;
             font-family: 'Google Sans', Roboto, Arial, sans-serif;
@@ -716,21 +717,31 @@ function createModal() {
   const customPromptSection = document.getElementById("custom-prompt-section");
   
   toggleSwitch.addEventListener("change", (e) => {
-    customPromptSection.style.display = e.target.checked ? "block" : "none";
     const replyContent = document.getElementById("reply-content");
-    
-    if (e.target.checked) {
-      // Hide the reply content in custom mode initially
-      replyContent.style.display = "none";
-    } else {
-      // Show the reply content and generate immediately in auto mode
-      replyContent.style.display = "block";
-      // Get the email content and generate reply automatically
-      const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
-      if (emailContent) {
-        generateReplyContent(emailContent.innerText, false, null);
-      }
-    }
+const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+const customPrompt = customPromptInput.value.trim();
+const autoCacheKey = `autoreply_${generateCacheKey()}`;
+const customCacheKey = `customreply_${generateCacheKey()}_${customPrompt}`;
+
+if (e.target.checked) {
+  // Enable custom mode
+  customPromptSection.style.display = "block";
+
+  if (responseCache.has(customCacheKey)) {
+    showCachedReply(responseCache.get(customCacheKey));
+  } else {
+    replyContent.style.display = "none"; // Wait for user to generate
+  }
+} else {
+  // Enable auto mode
+  customPromptSection.style.display = "none";
+
+  if (responseCache.has(autoCacheKey)) {
+    showCachedReply(responseCache.get(autoCacheKey));
+  } else if (emailContent) {
+    generateReplyWithCache(emailContent.innerText, extractReceiverEmail());
+  }
+}
   });
   
   // Add event listeners for preset buttons
@@ -1884,6 +1895,17 @@ function setupCachedReplyButtons(replyText, cacheKey, emailContent, receiverEmai
 // Update the generateReplyContent function to accept and use the recipient email
 async function generateReplyContent(emailContent, useCustomPrompt, customPrompt, receiverEmail) {
   const replyContent = document.getElementById("reply-content");
+  const cacheKey = useCustomPrompt 
+  ? `customreply_${generateCacheKey()}_${customPrompt}`
+  : `autoreply_${generateCacheKey()}`;
+
+// Check cache first
+if (responseCache.has(cacheKey)) {
+  console.log("📄 Using cached reply");
+  showCachedReply(responseCache.get(cacheKey));
+  return;
+}
+
   
   // Show loading state
   replyContent.innerHTML = `
@@ -2045,10 +2067,9 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
       throw new Error(data.error);
     }
     
-    // Cache the response
-      const cacheKey = `autoreply_${generateCacheKey()}`;
       responseCache.set(cacheKey, data.reply);
-      console.log("💾 Cached auto-reply response");
+      console.log(`💾 Cached ${useCustomPrompt ? "custom" : "auto"} reply response`);
+
 
       // Display the generated reply with fade effect
       displayReplyContent(replyContent, data.reply, usingFallback);
@@ -2083,6 +2104,20 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
       </div>
     `;
   }
+}
+
+// Helper function to show cached reply content in the reply box
+function showCachedReply(replyText) {
+  const replyContent = document.getElementById("reply-content");
+  replyContent.innerHTML = `
+    <div id="cached-reply-text" style="
+      white-space: pre-wrap;
+      line-height: 1.5;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+    ">${replyText}</div>
+  `;
+  replyContent.style.display = "block";
 }
 
 // Function to send email thread to analyze-thread endpoint

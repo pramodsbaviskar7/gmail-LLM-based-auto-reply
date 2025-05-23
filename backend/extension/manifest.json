@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RespondX",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Generate intelligent, personalized email responses in seconds with AI. Work smarter with Gmail's next evolution in communication.",
   "permissions": [],
   "host_permissions": [
@@ -10,9 +10,9 @@
     "https://gmail-llm-based-auto-reply.onrender.com/*"
   ],
   "icons": {
-    "16": "icon1.png",
-    "48": "icon1.png",
-    "128": "icon1.png"
+    "16": "icon2.png",
+    "48": "icon2.png",
+    "128": "icon2.png"
   },
   "content_scripts": [
     {

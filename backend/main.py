@@ -180,16 +180,16 @@ async def startup_event():
 
 
 
-MAX_TOKENS = MODEL_CONFIG.get("max_tokens", 32000)  # Safe max limit for mixtral or similar
+MAX_TOKENS = MODEL_CONFIG.get("max_tokens", 8000)  # Safe max limit for mixtral or similar
 
-def count_tokens(text: str, model: str = "gpt-3.5-turbo") -> int:
+def count_tokens(text: str, model: str = "llama3-8b-8192") -> int:
     try:
         enc = tiktoken.encoding_for_model(model)
     except KeyError:
         enc = tiktoken.get_encoding("cl100k_base")
     return len(enc.encode(text))
 
-def truncate_to_limit(text: str, token_limit: int, model: str = "gpt-3.5-turbo") -> str:
+def truncate_to_limit(text: str, token_limit: int, model: str = "llama3-8b-8192") -> str:
     try:
         enc = tiktoken.encoding_for_model(model)
     except KeyError:
@@ -402,7 +402,8 @@ async def generate_reply(request: Request):
             "Content-Type": "application/json"
         }
         user_identity = data.get("receiverEmail")
-        print(user_identity)
+        logger.info(f"mail received:\n{user_identity}")
+
 
         if user_identity and ("pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity):
             selected_user_info = USER_INFO
