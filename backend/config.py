@@ -18,5 +18,5 @@ EMAIL_CONFIG = {
 MODEL_CONFIG = {
     "model": "llama3-8b-8192",
     "temperature": 0.7,
-    "max_tokens": 500
+    "max_tokens": 7000
 }
