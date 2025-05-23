@@ -1889,220 +1889,131 @@ function setupCachedReplyButtons(replyText, cacheKey, emailContent, receiverEmai
     });
   }
 }
-
-// Update the generateReplyContent function to accept and use the recipient email
 async function generateReplyContent(emailContent, useCustomPrompt, customPrompt, receiverEmail) {
   const replyContent = document.getElementById("reply-content");
   const cacheKey = useCustomPrompt 
-  ? `customreply_${generateCacheKey()}_${customPrompt}`
-  : `autoreply_${generateCacheKey()}`;
+    ? `customreply_${generateCacheKey()}_${customPrompt}`
+    : `autoreply_${generateCacheKey()}`;
 
-// Check cache first
-if (responseCache.has(cacheKey)) {
-  console.log("📄 Using cached reply");
-  showCachedReply(responseCache.get(cacheKey));
-  return;
-}
+  // Use cache if available
+  if (responseCache.has(cacheKey)) {
+    console.log("📄 Using cached reply");
+    showCachedReply(responseCache.get(cacheKey));
+    return;
+  }
 
-  
   // Show loading state
   replyContent.innerHTML = `
-    <div class="loading-state" style="
-      text-align: center;
-      padding: 40px 0;
-    ">
-      <div style="
-        width: 60px;
-        height: 60px;
-        margin: 0 auto 24px;
-        position: relative;
-      ">
-        <div style="
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          border: 3px solid #f3f3f3;
-          border-radius: 50%;
-        "></div>
-        <div style="
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          border: 3px solid transparent;
-          border-top: 3px solid #1a73e8;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        "></div>
+    <div class="loading-state" style="text-align: center; padding: 40px 0;">
+      <div style="width: 60px; height: 60px; margin: 0 auto 24px; position: relative;">
+        <div style="position: absolute; width: 100%; height: 100%; border: 3px solid #f3f3f3; border-radius: 50%;"></div>
+        <div style="position: absolute; width: 100%; height: 100%; border: 3px solid transparent; border-top: 3px solid #1a73e8; border-radius: 50%; animation: spin 1s linear infinite;"></div>
       </div>
-      <h3 style="
-        margin: 0 0 8px 0;
-        font-family: 'Google Sans', Roboto, Arial, sans-serif;
-        font-size: 18px;
-        font-weight: 400;
-        color: #5f6368;
-      ">Crafting your reply...</h3>
-      <p style="
-        margin: 0;
-        color: #80868b;
-        font-size: 14px;
-      ">AI is analyzing the email and generating a professional response</p>
-      <p style="
-        margin: 16px 0 0 0;
-        color: #80868b;
-        font-size: 12px;
-      ">This may take a few seconds...</p>
+      <h3 style="margin: 0 0 8px 0; font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 18px; font-weight: 400; color: #5f6368;">Crafting your reply...</h3>
+      <p style="margin: 0; color: #80868b; font-size: 14px;">AI is analyzing the email and generating a professional response</p>
+      <p style="margin: 16px 0 0 0; color: #80868b; font-size: 12px;">This may take a few seconds...</p>
       ${receiverEmail ? `<p style="margin: 8px 0 0 0; color: #1a73e8; font-size: 12px;">Replying to: ${receiverEmail}</p>` : ''}
     </div>
   `;
-  
-  replyContent.style.opacity = "1";
   replyContent.classList.add("loading");
-  
+
   const requestBody = {
     prompt: emailContent,
     useCustomPrompt: Boolean(useCustomPrompt),
     customPrompt: customPrompt || "",
-    receiverEmail: receiverEmail || "" // Include receiver email if available
+    receiverEmail: receiverEmail || ""
   };
 
-  // Define primary and fallback API endpoints
   const PRIMARY_API = `${BACKEND_URL}/generate`;
   const FALLBACK_API = `${FALLBACK_URL}/generate`;
-  
+
+  let response;
   let usingFallback = false;
-  
+
   try {
-    // First try with primary API endpoint
-    console.log("Sending request to primary API:", PRIMARY_API);
-    console.log("Request body:", JSON.stringify(requestBody, null, 2));
-    
-    let response;
+    // Try primary
     try {
-      // Try primary endpoint first
       response = await fetch(PRIMARY_API, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
-        // Add timeout to catch long-running requests
-        signal: AbortSignal.timeout(15000) // 15 second timeout
+        signal: AbortSignal.timeout(15000)
       });
     } catch (primaryError) {
-      // Primary API failed, try fallback
-      console.warn("Primary API failed, trying fallback:", primaryError.message);
+      console.warn("Primary API failed, switching to fallback:", primaryError.message);
       usingFallback = true;
-      
-      // Show fallback notification in UI
-      const loadingStateEl = replyContent.querySelector(".loading-state p");
-      if (loadingStateEl) {
-        loadingStateEl.innerHTML = "Primary API unavailable. Trying backup server...";
-      }
-      
-      // Try fallback API
+      replyContent.querySelector(".loading-state p").innerText = "Primary API unavailable. Trying backup server...";
+
       response = await fetch(FALLBACK_API, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody)
       });
     }
-    
-    // Log response details
-    console.log(`Response from ${usingFallback ? "fallback" : "primary"} API:`, response.status);
-    
-    const responseText = await response.text();
-    
+
+    const raw = await response.text();
     if (!response.ok) {
-      // If primary API failed with error status, try fallback
-      if (!usingFallback && (response.status === 503 || response.status === 500 || response.status === 404)) {
-        console.warn(`Primary API returned ${response.status}, trying fallback API`);
+      if (!usingFallback && [500, 503, 404].includes(response.status)) {
         usingFallback = true;
-        
-        // Update loading message
-        const loadingStateEl = replyContent.querySelector(".loading-state p");
-        if (loadingStateEl) {
-          loadingStateEl.innerHTML = `Primary server returned ${response.status}. Trying backup server...`;
-        }
-        
-        // Try fallback API
+        replyContent.querySelector(".loading-state p").innerText = `Primary server returned ${response.status}. Trying backup server...`;
+
         const fallbackResponse = await fetch(FALLBACK_API, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody)
         });
-        
-        console.log("Fallback API response:", fallbackResponse.status);
-        
+
         if (!fallbackResponse.ok) {
-          throw new Error(`Both APIs failed. Fallback API: HTTP error! status: ${fallbackResponse.status}`);
+          throw new Error(`❌ Both APIs failed. Fallback API: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
         }
-        
-        const fallbackResponseText = await fallbackResponse.text();
-        const data = JSON.parse(fallbackResponseText);
-        
-        if (data.error) {
-          throw new Error(data.error);
+
+        const fallbackText = await fallbackResponse.text();
+        const fallbackData = JSON.parse(fallbackText);
+
+        if (fallbackData.error) {
+          throw new Error(fallbackData.error);
         }
-        
-        // Display the generated reply with fade effect
-        displayReplyContent(replyContent, data.reply, true);
+
+        displayReplyContent(replyContent, fallbackData.reply, true);
         return;
       } else {
-        // Both APIs failed or we're already using fallback
-        console.error("Response not OK:", response.status);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`⚠️ Server error: ${response.status} ${response.statusText}`);
       }
     }
-    
-    // Parse successful response
-    const data = JSON.parse(responseText);
-    
+
+    const data = JSON.parse(raw);
     if (data.error) {
       throw new Error(data.error);
     }
-    
-      responseCache.set(cacheKey, data.reply);
-      console.log(`💾 Cached ${useCustomPrompt ? "custom" : "auto"} reply response`);
 
+    responseCache.set(cacheKey, data.reply);
+    console.log(`💾 Cached ${useCustomPrompt ? "custom" : "auto"} reply response`);
+    displayReplyContent(replyContent, data.reply, usingFallback);
 
-      // Display the generated reply with fade effect
-      displayReplyContent(replyContent, data.reply, usingFallback);
-    
   } catch (error) {
-    console.error("Error generating reply:", error);
-    console.error("Error details:", error.message, error.stack);
-    
+    console.error("❌ Error generating reply:", error);
+    console.error("Details:", error.message, error.stack);
+
     replyContent.classList.remove("loading");
     replyContent.innerHTML = `
       <div style="text-align: center; padding: 40px 20px;">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="#ea4335" style="margin-bottom: 16px;">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
         </svg>
-        <h3 style="
-          margin: 0 0 12px 0;
-          font-family: 'Google Sans', Roboto, Arial, sans-serif;
-          font-size: 18px;
-          color: #202124;
-          font-weight: 400;
-        ">Failed to generate reply</h3>
-        <p style="
-          margin: 0 0 8px 0;
-          color: #5f6368;
-          font-size: 14px;
-        ">${error.message}</p>
-        <p style="
-          margin: 0;
-          color: #80868b;
-          font-size: 13px;
-        ">Our servers may be experiencing high traffic. Please try again later.</p>
+        <h3 style="margin: 0 0 12px 0; font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 18px; color: #202124; font-weight: 400;">
+          Failed to generate reply
+        </h3>
+        <p style="margin: 0 0 8px 0; color: #5f6368; font-size: 14px;">
+          ${error.message}
+        </p>
+        <p style="margin: 0; color: #80868b; font-size: 13px;">
+          🕒 Our servers may be busy. Please try again shortly.
+        </p>
       </div>
     `;
   }
 }
+
 
 // Helper function to show cached reply content in the reply box
 function showCachedReply(replyText) {
@@ -2118,81 +2029,77 @@ function showCachedReply(replyText) {
   replyContent.style.display = "block";
 }
 
-// Function to send email thread to analyze-thread endpoint
 async function analyzeEmailThread(threadData) {
   console.log("📊 Sending thread data to analyze-thread endpoint...");
-  
-  const requestBody = {
-    thread: threadData
-  };
 
-  // Use the same backend URLs as generateReply
+  const requestBody = { thread: threadData };
   const PRIMARY_API = `${BACKEND_URL}/analyze-thread`;
   const FALLBACK_API = `${FALLBACK_URL}/analyze-thread`;
-  
+
   let usingFallback = false;
-  
+
   try {
     let response;
+
     try {
-      // Try primary endpoint first
+      // Try primary API
       response = await fetch(PRIMARY_API, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(15000) // 15 second timeout
+        signal: AbortSignal.timeout(15000)
       });
     } catch (primaryError) {
       console.warn("Primary analyze-thread API failed, trying fallback:", primaryError.message);
       usingFallback = true;
-      
+
       // Try fallback API
       response = await fetch(FALLBACK_API, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
       });
     }
-    
+
     console.log(`Analyze-thread response from ${usingFallback ? "fallback" : "primary"} API:`, response.status);
-    
-    if (!response.ok) {
-      if (!usingFallback && (response.status === 503 || response.status === 500 || response.status === 404)) {
-        console.warn(`Primary analyze-thread API returned ${response.status}, trying fallback API`);
-        
+
+    // Handle 4xx and 5xx errors
+    if (response.status >= 400 && response.status < 600) {
+      const isClientError = response.status >= 400 && response.status < 500;
+      const type = isClientError ? "Client Error" : "Server Error";
+      const emoji = isClientError ? "⚠️" : "❌";
+      const fallbackMessage = `${emoji} ${type}: ${response.status} ${response.statusText}`;
+
+      // Try fallback if it's a retriable error and not already on fallback
+      if (!usingFallback && response.status >= 500) {
         const fallbackResponse = await fetch(FALLBACK_API, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody)
         });
-        
+
         if (!fallbackResponse.ok) {
-          throw new Error(`Both analyze-thread APIs failed. Fallback API: HTTP error! status: ${fallbackResponse.status}`);
+          throw new Error(`❌ Both APIs failed. Fallback status: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
         }
-        
+
         const fallbackData = await fallbackResponse.json();
         console.log("✅ Thread analysis completed via fallback API:", fallbackData);
         return fallbackData;
-      } else {
-        throw new Error(`Analyze-thread HTTP error! status: ${response.status}`);
       }
+
+      throw new Error(fallbackMessage);
     }
-    
+
+    // Success
     const data = await response.json();
     console.log("✅ Thread analysis completed:", data);
     return data;
-    
+
   } catch (error) {
-    console.error("❌ Error analyzing thread:", error);
-    console.error("Error details:", error.message);
-    // Don't throw error - this is a background operation
-    return null;
+    console.error("❌ Error analyzing thread:", error.message);
+    return {
+      error: `🚫 Analysis failed: ${error.message}. Please try again later.`
+    };
   }
 }
 
@@ -2233,10 +2140,10 @@ function displayReplyContent(replyContent, replyText, usedFallback) {
 // Function to display thread summary
 function displayThreadSummary(summaryContainer, analysisResult) {
   summaryContainer.style.opacity = "0";
-  
+
   setTimeout(() => {
     let summaryHTML = '';
-    
+
     // Add summary from API
     if (analysisResult.summary) {
       summaryHTML += `
@@ -2252,8 +2159,8 @@ function displayThreadSummary(summaryContainer, analysisResult) {
         </div>
       `;
     }
-    
-    // Add topics - handle the new format: topics.main[].label and subtopics
+
+    // Add topics
     if (analysisResult.topics && analysisResult.topics.main && analysisResult.topics.main.length > 0) {
       summaryHTML += `
         <div>
@@ -2264,10 +2171,7 @@ function displayThreadSummary(summaryContainer, analysisResult) {
             margin: 16px 0 8px 0;
             font-weight: 500;
           ">Key Topics</h4>
-          <ul style="
-            margin: 0;
-            padding-left: 20px;
-          ">
+          <ul style="margin: 0; padding-left: 20px;">
             ${analysisResult.topics.main.map(topic => `
               <li>
                 <strong>${topic.label}</strong>
@@ -2279,16 +2183,12 @@ function displayThreadSummary(summaryContainer, analysisResult) {
         </div>
       `;
     }
-    
-    // Add sentiment analysis - handle the new format: sentiment_analysis.overall
+
+    // Sentiment analysis
     if (analysisResult.sentiment_analysis) {
       const sentiment = analysisResult.sentiment_analysis;
       summaryHTML += `
-        <div style="
-          margin-top: 16px;
-          padding-top: 12px;
-          border-top: 1px solid #e8eaed;
-        ">
+        <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e8eaed;">
           <h4 style="
             font-family: 'Google Sans', Roboto, Arial, sans-serif;
             font-size: 15px;
@@ -2297,175 +2197,104 @@ function displayThreadSummary(summaryContainer, analysisResult) {
             font-weight: 500;
           ">Sentiment Analysis</h4>
           ${sentiment.overall ? `
-            <p style="
-              margin: 0 0 4px 0;
-              font-size: 13px;
-              color: #5f6368;
-            ">Overall Sentiment: <span style="color: #202124; font-weight: 500; text-transform: capitalize;">${sentiment.overall}</span></p>
-          ` : ''}
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #5f6368;">
+              Overall Sentiment: <span style="color: #202124; font-weight: 500; text-transform: capitalize;">${sentiment.overall}</span>
+            </p>` : ''}
           ${sentiment.tone_shifts && sentiment.tone_shifts.length > 0 ? `
-            <p style="
-              margin: 0;
-              font-size: 13px;
-              color: #5f6368;
-            ">Tone Changes: <span style="color: #202124; font-weight: 500;">${sentiment.tone_shifts.join(', ')}</span></p>
-          ` : `
-            <p style="
-              margin: 0;
-              font-size: 13px;
-              color: #5f6368;
-            ">Tone: <span style="color: #202124; font-weight: 500;">Consistent throughout</span></p>
-          `}
+            <p style="margin: 0; font-size: 13px; color: #5f6368;">
+              Tone Changes: <span style="color: #202124; font-weight: 500;">${sentiment.tone_shifts.join(', ')}</span>
+            </p>` : `
+            <p style="margin: 0; font-size: 13px; color: #5f6368;">
+              Tone: <span style="color: #202124; font-weight: 500;">Consistent throughout</span>
+            </p>`}
         </div>
       `;
     }
-    
-    // Add named entities - handle the new simplified format
+
+    // Named entities
     if (analysisResult.named_entities) {
       const entities = analysisResult.named_entities;
       let entitiesHTML = '';
-      
-      // People (now just an array of strings)
-      if (entities.people && entities.people.length > 0) {
+
+      if (entities.people?.length) {
         entitiesHTML += `
           <div style="margin-bottom: 12px;">
-            <h5 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 14px;
-              color: #202124;
-              margin: 0 0 4px 0;
-              font-weight: 500;
-            ">People</h5>
+            <h5 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #202124; margin: 0 0 4px 0; font-weight: 500;">People</h5>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
               ${entities.people.map(person => `<li>${person}</li>`).join('')}
             </ul>
-          </div>
-        `;
+          </div>`;
       }
-      
-      // Companies (now just an array of strings)
-      if (entities.companies && entities.companies.length > 0) {
+
+      if (entities.companies?.length) {
         entitiesHTML += `
           <div style="margin-bottom: 12px;">
-            <h5 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 14px;
-              color: #202124;
-              margin: 0 0 4px 0;
-              font-weight: 500;
-            ">Companies</h5>
+            <h5 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #202124; margin: 0 0 4px 0; font-weight: 500;">Companies</h5>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
               ${entities.companies.map(company => `<li>${company}</li>`).join('')}
             </ul>
-          </div>
-        `;
+          </div>`;
       }
-      
-      // Dates (if any)
-      if (entities.dates && entities.dates.length > 0) {
+
+      if (entities.dates?.length) {
         entitiesHTML += `
           <div style="margin-bottom: 12px;">
-            <h5 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 14px;
-              color: #202124;
-              margin: 0 0 4px 0;
-              font-weight: 500;
-            ">Important Dates</h5>
+            <h5 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #202124; margin: 0 0 4px 0; font-weight: 500;">Important Dates</h5>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
               ${entities.dates.map(date => `<li>${date}</li>`).join('')}
             </ul>
-          </div>
-        `;
+          </div>`;
       }
-      
-      // Email addresses (if any)
-      if (entities.email_addresses && entities.email_addresses.length > 0) {
+
+      if (entities.email_addresses?.length) {
         entitiesHTML += `
           <div style="margin-bottom: 12px;">
-            <h5 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 14px;
-              color: #202124;
-              margin: 0 0 4px 0;
-              font-weight: 500;
-            ">Email Addresses</h5>
+            <h5 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #202124; margin: 0 0 4px 0; font-weight: 500;">Email Addresses</h5>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
               ${entities.email_addresses.map(email => `<li>${email}</li>`).join('')}
             </ul>
-          </div>
-        `;
+          </div>`;
       }
-      
-      // Mobile numbers (if any)
-      if (entities.mobile_numbers && entities.mobile_numbers.length > 0) {
+
+      if (entities.mobile_numbers?.length) {
         entitiesHTML += `
           <div style="margin-bottom: 12px;">
-            <h5 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 14px;
-              color: #202124;
-              margin: 0 0 4px 0;
-              font-weight: 500;
-            ">Phone Numbers</h5>
+            <h5 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #202124; margin: 0 0 4px 0; font-weight: 500;">Phone Numbers</h5>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
               ${entities.mobile_numbers.map(number => `<li>${number}</li>`).join('')}
             </ul>
-          </div>
-        `;
+          </div>`;
       }
-      
-      // Locations (if any)
-      if (entities.locations && entities.locations.length > 0) {
+
+      if (entities.locations?.length) {
         entitiesHTML += `
           <div style="margin-bottom: 12px;">
-            <h5 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 14px;
-              color: #202124;
-              margin: 0 0 4px 0;
-              font-weight: 500;
-            ">Locations</h5>
+            <h5 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #202124; margin: 0 0 4px 0; font-weight: 500;">Locations</h5>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
               ${entities.locations.map(location => `<li>${location}</li>`).join('')}
             </ul>
-          </div>
-        `;
+          </div>`;
       }
-      
+
       if (entitiesHTML) {
         summaryHTML += `
-          <div style="
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px solid #e8eaed;
-          ">
-            <h4 style="
-              font-family: 'Google Sans', Roboto, Arial, sans-serif;
-              font-size: 15px;
-              color: #202124;
-              margin: 0 0 12px 0;
-              font-weight: 500;
-            ">Key Information</h4>
+          <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e8eaed;">
+            <h4 style="font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 15px; color: #202124; margin: 0 0 12px 0; font-weight: 500;">Key Information</h4>
             ${entitiesHTML}
-          </div>
-        `;
+          </div>`;
       }
     }
-    
-    // If the API returned empty results
+
+    // If nothing was added, show friendly fallback
     if (summaryHTML === '') {
       summaryHTML = `
-        <div style="text-align: center; padding: 20px;">
-          <p style="
-            margin: 0;
-            color: #5f6368;
-            font-size: 14px;
-          ">No conversation analysis available for this thread.</p>
+        <div style="text-align: center; padding: 24px; color: #5f6368;">
+          <p style="font-size: 16px;">🤷‍♂️ No analysis available</p>
+          <p style="font-size: 13px;">We couldn’t extract any meaningful summary from this thread. It may be too short, incomplete, or unsupported.</p>
         </div>
       `;
     }
-    
+
     summaryContainer.innerHTML = summaryHTML;
     summaryContainer.style.transition = "opacity 0.3s ease-in";
     summaryContainer.style.opacity = "1";
