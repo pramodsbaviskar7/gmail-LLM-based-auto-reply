@@ -253,34 +253,98 @@ class CircuitBreaker:
                 **self._stats
             }
 
-# Load configuration
+import os
+import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Set up logger
+logger = logging.getLogger(__name__)
+
 def load_configuration():
-    current_dir = Path(__file__).parent
-    env_path = current_dir / '.env'
+    """
+    Universal configuration loader that works for:
+    - Local development (with .env file)
+    - Vercel deployment 
+    - Render deployment
+    - Other cloud platforms
+    """
     
-    if env_path.exists():
-        load_dotenv(env_path)
-        logger.info(f"Loaded environment from {env_path}")
+    # Detect deployment platform
+    is_vercel = os.getenv('VERCEL') == '1'
+    is_render = os.getenv('RENDER') == 'true'
+    environment = os.getenv('ENVIRONMENT', 'development')
+    
+    # Log platform detection
+    platform = 'Vercel' if is_vercel else 'Render' if is_render else 'Local/Other'
+    logger.info(f"🚀 Platform detected: {platform}")
+    logger.info(f"🌍 Environment: {environment}")
+    
+    # Load .env file for local development (your working approach)
+    if not is_vercel and not is_render:
+        # Your working local setup
+        current_dir = Path(__file__).parent
+        env_path = current_dir / '.env'
+        
+        if env_path.exists():
+            load_dotenv(env_path)
+            logger.info(f"📄 Loaded environment from {env_path}")
+        else:
+            load_dotenv()
+            logger.warning("⚠️  No .env file found, using system environment")
     else:
-        load_dotenv()
-        logger.warning("No .env file found, using system environment")
+        # For production deployments, only use environment variables
+        logger.info(f"🔧 Production mode: Using environment variables only")
     
+    # Validate required environment variables
     required_vars = ["GROQ_API_KEY"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
-        logger.error(f"Missing required environment variables: {missing_vars}")
+        logger.error(f"❌ Missing required environment variables: {missing_vars}")
+        
+        # Provide helpful error messages based on platform
+        if is_vercel:
+            logger.error("🔧 Fix: Add environment variables in Vercel Dashboard → Settings → Environment Variables")
+        elif is_render:
+            logger.error("🔧 Fix: Add environment variables in Render Dashboard → Environment")
+        else:
+            logger.error("🔧 Fix: Create .env file or export environment variables")
+            
         raise ValueError(f"Missing required environment variables: {missing_vars}")
     
-    return {
-        "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
+    # Log successful API key detection (safely)
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        logger.info(f"🔑 GROQ_API_KEY loaded: {groq_key[:8]}...{groq_key[-4:]}")
+    
+    # Return configuration dictionary
+    config = {
+        "GROQ_API_KEY": groq_key,
         "API_SECRET_KEY": os.getenv("API_SECRET_KEY", "your-secret-key"),
+        "ENVIRONMENT": environment,
         "RATE_LIMIT_PER_MINUTE": int(os.getenv("RATE_LIMIT_PER_MINUTE", "100")),
         "MAX_CONCURRENT_REQUESTS": int(os.getenv("MAX_CONCURRENT_REQUESTS", "50")),
         "CACHE_TTL_SECONDS": int(os.getenv("CACHE_TTL_SECONDS", "300")),
-        "CACHE_MAX_SIZE": int(os.getenv("CACHE_MAX_SIZE", "5000"))
+        "CACHE_MAX_SIZE": int(os.getenv("CACHE_MAX_SIZE", "5000")),
+        "PORT": int(os.getenv("PORT", "8000")),
+        
+        # Platform-specific settings
+        "IS_VERCEL": is_vercel,
+        "IS_RENDER": is_render,
+        "PLATFORM": platform,
+        
+        # Timeout settings (Vercel has 30s limit on Hobby plan)
+        "TIMEOUT_SECONDS": int(os.getenv("TIMEOUT_SECONDS", "25" if is_vercel else "30"))
     }
-
+    
+    logger.info("✅ Configuration loaded successfully")
+    logger.info(f"⚙️  Rate limit: {config['RATE_LIMIT_PER_MINUTE']}/min")
+    logger.info(f"⚙️  Cache TTL: {config['CACHE_TTL_SECONDS']}s")
+    logger.info(f"⚙️  Platform: {config['PLATFORM']}")
+    
+    return config
+    
 # Load configuration
 try:
     # FORCE RELOAD ENVIRONMENT - DEBUG
