@@ -253,53 +253,58 @@ class CircuitBreaker:
                 **self._stats
             }
 
-def load_configuration():
-    """
-    Load configuration from environment variables with local .env fallback
-    """
+# Your original working approach - simplified and cleaned up
+current_dir = Path(__file__).parent
+logger.info(f"Current directory: {current_dir}")
+logger.info(f"Looking for .env file at: {current_dir / '.env'}")
+
+# Load environment variables with explicit path (your working method)
+env_path = current_dir / '.env'
+if env_path.exists():
+    logger.info(f".env file found at {env_path}")
+    load_dotenv(env_path)
+else:
+    logger.info(f".env file NOT found at {env_path}")
+    # Try loading from current working directory
+    logger.info(f"Trying to load from current working directory: {os.getcwd()}")
+    load_dotenv()
+
+# Debug: Print environment variables (your working debug method)
+logger.info("Environment variables loaded:")
+for key, value in os.environ.items():
+    if key.startswith("GROQ") or "API" in key:
+        logger.info(f"{key}: {value[:10]}..." if value else f"{key}: None")
+
+# Get the API key (your working method)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Your original validation with better error messages
+if not GROQ_API_KEY:
+    logger.error("GROQ_API_KEY not found in environment variables!")
+    logger.error("Make sure your .env file contains: GROQ_API_KEY=your_actual_key")
     
-    # Detect if we're on a production platform
-    is_production_platform = (
-        os.getenv('VERCEL') == '1' or 
-        os.getenv('RENDER') == 'true' or 
-        os.getenv('ENVIRONMENT') == 'production'
-    )
+    # Check if there's a similar key with different casing
+    for key in os.environ.keys():
+        if "GROQ" in key.upper() or "API" in key.upper():
+            logger.info(f"Found similar key: {key}")
     
-    if is_production_platform:
-        # Production: Use environment variables only
-        logger.info("🔧 Production platform detected - using environment variables")
-    else:
-        # Local development: Use your working .env approach
-        current_dir = Path(__file__).parent
-        env_path = current_dir / '.env'
-        
-        if env_path.exists():
-            load_dotenv(env_path)
-            logger.info(f"Loaded environment from {env_path}")
-        else:
-            load_dotenv()
-            logger.warning("No .env file found, using system environment")
-    
-    # Validate required environment variables
-    required_vars = ["GROQ_API_KEY"]
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        logger.error(f"Missing required environment variables: {missing_vars}")
-        raise ValueError(f"Missing required environment variables: {missing_vars}")
-    
-    # Read ALL values from environment variables (since you have them all set)
-    return {
-        "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
-        "API_SECRET_KEY": os.getenv("API_SECRET_KEY", "default-secret"),
-        "RATE_LIMIT_PER_MINUTE": int(os.getenv("RATE_LIMIT_PER_MINUTE", "100")),
-        "MAX_CONCURRENT_REQUESTS": int(os.getenv("MAX_CONCURRENT_REQUESTS", "50")),
-        "CACHE_TTL_SECONDS": int(os.getenv("CACHE_TTL_SECONDS", "300")),
-        "CACHE_MAX_SIZE": int(os.getenv("CACHE_MAX_SIZE", "5000")),
-        "PORT": int(os.getenv("PORT", "8000")),
-        "ENVIRONMENT": os.getenv("ENVIRONMENT", "development")
-    }
-# Load configuration
+    raise ValueError("GROQ_API_KEY is required. Check the logs above for details.")
+else:
+    logger.info(f"GROQ_API_KEY loaded successfully (key starts with: {GROQ_API_KEY[:10]}...)")
+
+# Create a simple config dictionary (instead of a function)
+config = {
+    "GROQ_API_KEY": GROQ_API_KEY,
+    "API_SECRET_KEY": os.getenv("API_SECRET_KEY", "default-secret"),
+    "RATE_LIMIT_PER_MINUTE": int(os.getenv("RATE_LIMIT_PER_MINUTE", "100")),
+    "MAX_CONCURRENT_REQUESTS": int(os.getenv("MAX_CONCURRENT_REQUESTS", "50")),
+    "CACHE_TTL_SECONDS": int(os.getenv("CACHE_TTL_SECONDS", "300")),
+    "CACHE_MAX_SIZE": int(os.getenv("CACHE_MAX_SIZE", "5000")),
+    "PORT": int(os.getenv("PORT", "8000")),
+    "ENVIRONMENT": os.getenv("ENVIRONMENT", "development")
+}
+
+logger.info("✅ Configuration loaded successfully")
 try:
     # FORCE RELOAD ENVIRONMENT - DEBUG
     print("🔧 FORCING FRESH .ENV RELOAD...")
@@ -322,7 +327,6 @@ try:
     print(f"Fresh API key loaded: {fresh_key[:20] if fresh_key else 'NONE'}...")
     print("=" * 50)
     
-    config = load_configuration()
     GROQ_API_KEY = config["GROQ_API_KEY"]
     API_SECRET_KEY = config["API_SECRET_KEY"]
     
