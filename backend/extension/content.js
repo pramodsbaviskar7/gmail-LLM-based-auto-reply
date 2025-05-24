@@ -714,33 +714,40 @@ function createModal() {
   const toggleSwitch = document.getElementById("custom-mode-switch");
   const customPromptSection = document.getElementById("custom-prompt-section");
   
-  toggleSwitch.addEventListener("change", (e) => {
-    const replyContent = document.getElementById("reply-content");
-const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
-const customPrompt = customPromptInput.value.trim();
-const autoCacheKey = `autoreply_${generateCacheKey()}`;
-const customCacheKey = `customreply_${generateCacheKey()}_${customPrompt}`;
+  // Replace the existing toggleSwitch.addEventListener("change", (e) => { ... }) with this:
 
-if (e.target.checked) {
-  // Enable custom mode
-  customPromptSection.style.display = "block";
+toggleSwitch.addEventListener("change", (e) => {
+  const replyContent = document.getElementById("reply-content");
+  const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+  const customPrompt = customPromptInput.value.trim();
+  const autoCacheKey = `autoreply_${generateCacheKey()}`;
+  const customCacheKey = `customreply_${generateCacheKey()}_${customPrompt}`;
+  
+  // GET RECEIVER EMAIL HERE - This was missing!
+  const receiverEmail = extractReceiverEmail();
+  console.log("📧 Receiver email in toggle:", receiverEmail);
 
-  if (responseCache.has(customCacheKey)) {
-    showCachedReply(responseCache.get(customCacheKey));
+  if (e.target.checked) {
+    // Enable custom mode
+    customPromptSection.style.display = "block";
+
+    if (responseCache.has(customCacheKey)) {
+      showCachedReply(responseCache.get(customCacheKey));
+    } else {
+      replyContent.style.display = "none"; // Wait for user to generate
+    }
   } else {
-    replyContent.style.display = "none"; // Wait for user to generate
-  }
-} else {
-  // Enable auto mode
-  customPromptSection.style.display = "none";
+    // Enable auto mode
+    customPromptSection.style.display = "none";
 
-  if (responseCache.has(autoCacheKey)) {
-    showCachedReply(responseCache.get(autoCacheKey));
-  } else if (emailContent) {
-    generateReplyWithCache(emailContent.innerText, extractReceiverEmail());
+    if (responseCache.has(autoCacheKey)) {
+      showCachedReply(responseCache.get(autoCacheKey));
+    } else if (emailContent) {
+      // PASS receiverEmail here - This was missing!
+      generateReplyWithCache(emailContent.innerText, receiverEmail);
+    }
   }
-}
-  });
+});
   
   // Add event listeners for preset buttons
   const presetButtons = document.querySelectorAll(".preset-btn");
@@ -760,26 +767,32 @@ if (e.target.checked) {
    });
    
   // Add event listener for Generate Reply button
-  const generateButton = document.getElementById("generate-custom-reply");
-  if (generateButton) {
-    generateButton.addEventListener("click", () => {
-      const customPrompt = customPromptInput.value.trim();
-      if (!customPrompt) {
-        alert("Please enter a custom prompt or select a preset option");
-        return;
-      }
+  // Replace the existing generateButton.addEventListener("click", () => { ... }) with this:
+
+const generateButton = document.getElementById("generate-custom-reply");
+if (generateButton) {
+  generateButton.addEventListener("click", () => {
+    const customPrompt = customPromptInput.value.trim();
+    if (!customPrompt) {
+      alert("Please enter a custom prompt or select a preset option");
+      return;
+    }
+    
+    // Show reply content area and generate with custom prompt
+    const replyContent = document.getElementById("reply-content");
+    replyContent.style.display = "block";
+    
+    const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+    if (emailContent) {
+      // GET RECEIVER EMAIL HERE - This was the main missing piece!
+      const receiverEmail = extractReceiverEmail();
+      console.log("📧 Receiver email in custom generate:", receiverEmail);
       
-      // Show reply content area and generate with custom prompt
-      const replyContent = document.getElementById("reply-content");
-      replyContent.style.display = "block";
-      
-      const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
-      if (emailContent) {
-        generateReplyContent(emailContent.innerText, true, customPrompt);
-      }
-    });
-  }
-  
+      // PASS receiverEmail to generateReplyContent - This was missing!
+      generateReplyContent(emailContent.innerText, true, customPrompt, receiverEmail);
+    }
+  });
+} 
   // Header Summary Button - Generate and show summary data
   const summaryToggleBtn = document.getElementById("summary-toggle-btn");
   const threadSummarySection = document.getElementById("thread-summary-section");
