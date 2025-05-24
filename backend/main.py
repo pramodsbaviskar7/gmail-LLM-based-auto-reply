@@ -893,6 +893,7 @@ Do not include any additional content.
         logger.error(f"Analysis error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.head("/health")
 @app.get("/health")
 async def health_check():
     try:
