@@ -171,7 +171,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Pramod Baviskar**
 - LinkedIn: [@pramodsbaviskar](https://www.linkedin.com/in/pramodsbaviskar/)
 - GitHub: [@pramodbaviskar](https://github.com/pramodbaviskar)
-- Email: pramod.baviskar@gmail.com
+- Email: pramodsbaviskar7@gmail.com
 
 ## 🙏 Acknowledgments
 
