@@ -147,43 +147,12 @@ For developers interested in contributing or customizing the extension:
 - Check `/health` endpoint for rate limit status
 - Implement exponential backoff in your usage
 
-### Debug Mode
-
-Enable debug logging in development:
-```bash
-# Backend debug mode
-ENVIRONMENT=development uvicorn main:app --reload --log-level debug
-
-# Extension debug mode
-# Open Chrome DevTools in Gmail and check console logs
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please feel free to submit a Pull Request.
-
-### Development Process
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Make your changes
-4. Add tests if applicable
-5. Ensure code formatting (`black`, `prettier`)
-6. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-7. Push to the branch (`git push origin feature/AmazingFeature`)
-8. Open a Pull Request
 
 ### Code Standards
 - Python: Follow PEP 8, use Black for formatting
 - JavaScript: Use ES6+, consistent indentation
 - Documentation: Update README for new features
 - Testing: Add tests for new functionality
-
-## 🚀 Deployment Status
-
-| Platform | Status | URL |
-|----------|--------|-----|
-| Vercel | 🟢 Live | `https://gmail-llm-based-auto-reply.vercel.app` |
-| Render | 🟢 Live | `https://gmail-llm-based-auto-reply.onrender.com` |
 
 ## 📊 Performance
 
