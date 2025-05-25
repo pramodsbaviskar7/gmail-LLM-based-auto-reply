@@ -49,7 +49,7 @@ AI-powered Chrome extension that auto-generates intelligent Gmail replies using 
 
 ## 📸 Screenshots
 
-[Add screenshots of your extension in action here]
+![alt text](ss1_1280x800.png) ![alt text](ss2_1280x800.png) ![alt text](ss3_1280x800.png)
 
 ## 🛠️ Tech Stack
 
