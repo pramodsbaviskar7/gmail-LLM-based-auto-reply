@@ -79,7 +79,6 @@ AI-powered Chrome extension that auto-generates intelligent Gmail replies using 
 
 ### Chrome Extension
 1. Install from [Chrome Web Store](https://chrome.google.com/webstore) (Coming Soon)
-2. Or download from [Releases](https://github.com/yourusername/gmail-auto-reply-extension/releases)
 
 ## 🔧 Configuration
 
@@ -126,55 +125,6 @@ For developers interested in contributing or customizing the extension:
 - Node.js 18+ (for development tools)
 - Groq API key ([Get it here](https://console.groq.com))
 
-### API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | API status and information |
-| `/health` | GET/HEAD | Comprehensive health check |
-| `/ping` | GET/HEAD | Simple uptime check |
-| `/generate` | POST | Generate email reply |
-| `/analyze-thread` | POST | Analyze email thread |
-
-### Health Check Response
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-05-25T03:29:56Z",
-  "api_latency_ms": 150.2,
-  "cache": {
-    "hits": 45,
-    "misses": 12,
-    "size": 57
-  },
-  "circuit_breaker": {
-    "state": "closed",
-    "failure_count": 0
-  },
-  "version": "2.0.0"
-}
-```
-
-## 📁 Project Structure
-
-```
-gmail-auto-reply-extension/
-├── backend/
-│   ├── main.py              # FastAPI application
-│   ├── config.py            # Configuration file
-│   ├── requirements.txt     # Python dependencies
-│   ├── .env                 # Environment variables
-│   ├── .env.example         # Environment template
-│   └── vercel.json          # Vercel deployment config
-├── extension/
-│   ├── manifest.json        # Chrome extension manifest
-│   ├── content.js           # Main extension logic
-│   ├── popup.html           # Extension popup UI
-│   ├── popup.js             # Popup functionality
-│   └── styles.css           # Extension styles
-├── README.md
-└── LICENSE
-```
 
 ## 🐛 Troubleshooting
 
@@ -185,11 +135,6 @@ gmail-auto-reply-extension/
 - Check for errors in Chrome DevTools console
 - Verify manifest.json is valid
 
-#### API not responding?
-- Verify backend is running (`curl http://localhost:8000/health`)
-- Check GROQ_API_KEY environment variable
-- Ensure CORS is configured properly
-- Check API rate limits
 
 #### Email detection not working?
 - Clear extension storage in Chrome settings
