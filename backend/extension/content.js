@@ -2,12 +2,13 @@ console.log("✅ Gmail Auto LLM Reply: Content script loaded");
 
 const BUTTON_ID = "auto-reply-button";
 const MODAL_ID = "auto-reply-modal";
-const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
+const BACKEND_URL = "http://localhost:8000"; // Change to local for debugging
+// const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
 const FALLBACK_URL = "https://gmail-llm-based-auto-reply.onrender.com";
 let checkInterval = null;
 let currentUrl = window.location.href;
+let userPreferences = null;
 
-// ADD THIS CACHING CODE HERE:
 // Cache for API responses to avoid unnecessary calls
 const responseCache = new Map();
 
@@ -20,6 +21,182 @@ function generateCacheKey() {
   
   // Fallback to URL hash if no thread ID found
   return emailSubject || window.location.hash || 'default';
+}
+
+// Helper function to get available storage (sync preferred, fallback to local)
+const getStorage = () => {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    return chrome.storage.sync || chrome.storage.local;
+  }
+  return null;
+};
+
+// Function to load user preferences from Chrome storage
+async function loadUserPreferences() {
+  return new Promise((resolve) => {
+    const storage = getStorage();
+    if (!storage) {
+      console.warn('Chrome storage not available, using default preferences');
+      userPreferences = null;
+      resolve(null);
+      return;
+    }
+    
+    storage.get(['userEmail', 'userInfo'], function(result) {
+      if (chrome.runtime.lastError) {
+        console.error('Error loading user preferences:', chrome.runtime.lastError);
+        userPreferences = null;
+        resolve(null);
+        return;
+      }
+      
+      console.log('📱 Loaded user preferences:', result);
+      
+      // Construct user preferences object
+      if (result.userInfo || result.userEmail) {
+        userPreferences = {
+          email: result.userInfo?.email || result.userEmail || null,
+          full_name: result.userInfo?.full_name || null,
+          linkedin: result.userInfo?.linkedin || null,
+          mobile: result.userInfo?.mobile || null
+        };
+        
+        console.log('✅ User preferences loaded successfully:', userPreferences);
+      } else {
+        console.log('ℹ️ No user preferences found in storage');
+        userPreferences = null;
+      }
+      
+      resolve(userPreferences);
+    });
+  });
+}
+
+
+
+// Function to get user signature information
+function getUserSignatureInfo() {
+  if (!hasUserPreferences()) {
+    return null;
+  }
+  
+  const signatureInfo = {
+    hasPreferences: true,
+    email: userPreferences.email,
+    full_name: userPreferences.full_name,
+    linkedin: userPreferences.linkedin,
+    mobile: userPreferences.mobile
+  };
+  
+  console.log('📝 User signature info:', signatureInfo);
+  return signatureInfo;
+}
+
+// Function to check if user has saved preferences
+// Function to check if user has saved preferences
+function hasUserPreferences() {
+  return userPreferences !== null && (
+    (userPreferences.email && userPreferences.email.trim() !== '') || 
+    (userPreferences.full_name && userPreferences.full_name.trim() !== '') || 
+    (userPreferences.linkedin && userPreferences.linkedin.trim() !== '') || 
+    (userPreferences.mobile && userPreferences.mobile.trim() !== '')
+  );
+}
+
+// Function to update user preferences status display in the modal
+// Replace the existing updateUserPreferencesStatus function with this:
+function updateUserPreferencesStatus() {
+  const statusContainer = document.getElementById("user-preferences-status");
+  const iconContainer = document.getElementById("preferences-icon");
+  const titleElement = document.getElementById("preferences-title");
+  const subtitleElement = document.getElementById("preferences-subtitle");
+  const setupButton = document.getElementById("setup-preferences-btn");
+  const settingsButton = document.getElementById("settings-toggle-btn");
+
+  if (!statusContainer || !settingsButton) return;
+
+  // Remove any existing badge to ensure clean state
+  const existingBadge = settingsButton.querySelector(".exclamation-badge");
+  if (existingBadge) {
+    existingBadge.remove();
+  }
+
+  if (hasUserPreferences()) {
+    // User has preferences - show success state
+    statusContainer.style.background = "#e8f5e8";
+    statusContainer.style.borderColor = "#c8e6c9";
+
+    iconContainer.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#34a853">
+        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+      </svg>
+    `;
+    iconContainer.style.background = "#c8e6c9";
+
+    titleElement.textContent = "✅ Preferences Configured";
+    titleElement.style.color = "#137333";
+
+    // Show which preferences are set
+    const prefDetails = [];
+    if (userPreferences.full_name && userPreferences.full_name.trim()) prefDetails.push("Name");
+    if (userPreferences.email && userPreferences.email.trim()) prefDetails.push("Email");
+    if (userPreferences.linkedin && userPreferences.linkedin.trim()) prefDetails.push("LinkedIn");
+    if (userPreferences.mobile && userPreferences.mobile.trim()) prefDetails.push("Phone");
+
+    subtitleElement.innerHTML = `Your signature includes: <strong>${prefDetails.join(", ")}</strong>. AI will personalize replies accordingly.`;
+
+    setupButton.style.display = "none";
+    
+    // IMPORTANT: Remove the badge when preferences are set
+    const badge = settingsButton.querySelector(".exclamation-badge");
+    if (badge) {
+      badge.remove();
+    }
+  } else {
+    // User has no preferences - show setup prompt
+    statusContainer.style.background = "#fff3e0";
+    statusContainer.style.borderColor = "#ffcc80";
+
+    iconContainer.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#f57c00">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+      </svg>
+    `;
+    iconContainer.style.background = "#ffcc80";
+
+    titleElement.textContent = "🔧 Setup Personal Signature";
+    titleElement.style.color = "#e65100";
+
+    subtitleElement.innerHTML = "Configure your name, email, and contact info for <strong>personalized AI replies</strong> with proper signatures.";
+
+    setupButton.style.display = "inline-block";
+    setupButton.textContent = "Setup Now";
+
+    // Only add badge if preferences are not set
+    if (!settingsButton.querySelector(".exclamation-badge")) {
+      const badge = document.createElement("div");
+      badge.className = "exclamation-badge";
+      badge.style.cssText = `
+        position: absolute;
+        top: 0px;
+        right: 0px;
+        width: 12px;
+        height: 12px;
+        background: #ea4335;
+        border-radius: 50%;
+        border: 2px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: white;
+        font-weight: bold;
+        z-index: 2;
+      `;
+      badge.textContent = "!";
+      settingsButton.appendChild(badge);
+    }
+  }
 }
 
 // Helper function to clear cache when navigating away from email
@@ -47,7 +224,6 @@ clearCacheOnNavigation();
 // Function to create the modal for auto-reply
 // Function to create the modal for auto-reply
 function createModal() {
-  // Check if modal already exists
   if (document.getElementById(MODAL_ID)) {
     return {
       modal: document.getElementById(MODAL_ID),
@@ -55,7 +231,6 @@ function createModal() {
     };
   }
   
-  // Create backdrop for modal
   const backdrop = document.createElement("div");
   backdrop.id = "modal-backdrop";
   backdrop.style.cssText = `
@@ -64,11 +239,11 @@ function createModal() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
     z-index: 9999;
     display: none;
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   `;
   
   const modal = document.createElement("div");
@@ -77,38 +252,48 @@ function createModal() {
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0.9);
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.18);
-    width: 680px;
-    max-width: 90vw;
-    max-height: 85vh;
+    transform: translate(-50%, -50%) scale(0.95);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    width: 720px;
+    max-width: 92vw;
+    max-height: 90vh;
     overflow: hidden;
     z-index: 10000;
     display: none;
-    animation: modalSlideIn 0.4s ease-out forwards;
+    animation: modalPopIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    border: 1px solid rgba(255, 255, 255, 0.3);
   `;
   
   modal.innerHTML = `
     <div style="
-      background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
-      padding: 24px 32px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);
+      padding: 28px 32px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      position: relative;
+      overflow: hidden;
     ">
-      <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        z-index: 2;
+      ">
         <div style="
-          width: 40px;
-          height: 40px;
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 50%;
+          width: 48px;
+          height: 48px;
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         ">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
             <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
           </svg>
         </div>
@@ -117,15 +302,16 @@ function createModal() {
             margin: 0;
             font-family: 'Google Sans', Roboto, Arial, sans-serif;
             color: white;
-            font-size: 24px;
-            font-weight: 400;
-          ">AI Powered Email Assistant</h2>
+            font-size: 26px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+          ">AI Email Assistant</h2>
           <p style="
-            margin: 0;
+            margin: 4px 0 0 0;
             font-family: Roboto, Arial, sans-serif;
             color: rgba(255, 255, 255, 0.9);
             font-size: 14px;
-          ">Developed and crafted by 
+          ">Crafted by 
             <a href="https://www.linkedin.com/in/pramodsbaviskar/" 
                target="_blank" 
                rel="noopener noreferrer"
@@ -134,233 +320,361 @@ function createModal() {
                  color: white;
                  text-decoration: none;
                  font-weight: 500;
-                 border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-                 transition: border-color 0.2s ease;
+                 border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+                 transition: border-color 0.3s ease;
                ">Pramod Baviskar</a>
           </p>
         </div>
       </div>
       
-      <!-- Right side buttons -->
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <!-- Summary Toggle Button -->
-        <button id="summary-toggle-btn" style="
- background: rgba(255, 255, 255, 0.15);
- border: 1px solid rgba(255, 255, 255, 0.3);
- padding: 8px 12px;
- border-radius: 20px;
- color: white;
- font-family: Roboto, Arial, sans-serif;
- font-size: 12px;
- font-weight: bold;
- cursor: pointer;
- transition: all 0.3s ease;
- display: flex;
- align-items: center;
- gap: 6px;
-">
- <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-   <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
- </svg>
- Check Email Summary
-</button>
+      <div style="display: flex; align-items: center; gap: 12px; z-index: 2;">
+        <div style="position: relative;">
+          <button id="settings-toggle-btn" style="
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 10px;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.82,11.69,4.82,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+          </button>
+        </div>
         
-        <!-- Close Button -->
-        <button id="close-modal" style="
-          background: rgba(255, 255, 255, 0.1);
+        <button id="summary-toggle-btn" style="
+          background: rgba(255, 255, 255, 0.2);
           border: none;
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
+          padding: 10px 16px;
+          border-radius: 12px;
+          color: white;
+          font-family: 'Google Sans', Roboto, Arial, sans-serif;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+          </svg>
+          Email Summary
+        </button>
+        
+        <button id="close-modal" style="
+          background: rgba(255, 255, 255, 0.15);
+          border: none;
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
           cursor: pointer;
           color: white;
           font-size: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.2s ease;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         ">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
           </svg>
         </button>
       </div>
+      <div style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.2), transparent 50%);
+        pointer-events: none;
+      "></div>
     </div>
     
     <div style="
       padding: 32px;
-      max-height: calc(85vh - 180px);
+      max-height: calc(90vh - 200px);
       overflow-y: auto;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(245, 245, 245, 0.95));
     " id="modal-scroll-container">
-  
-      <!-- Custom Reply Mode - Properly Aligned -->
-<div id="custom-prompt-toggle" style="
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e8eaed;
-">
-  <div style="
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  ">
-    <div style="flex: 1;">
-      <h3 style="
-        margin: 0 0 2px 0;
-        font-family: 'Google Sans', Roboto, Arial, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        color: #202124;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      ">
-        ✏️ Custom Reply Mode
-      </h3>
-      <p style="
-        margin: 0;
-        font-size: 12px;
-        color: #5f6368;
-        line-height: 1.3;
-      ">Provide custom instructions for AI</p>
-    </div>
-    
-    <!-- Properly aligned toggle switch -->
-    <label class="toggle-switch" style="
-      position: relative;
-      display: inline-block;
-      width: 44px;
-      height: 24px;
-      margin-left: 16px;
-      flex-shrink: 0;
-    ">
-      <input type="checkbox" id="custom-mode-switch" style="
-        opacity: 0;
-        width: 0;
-        height: 0;
-      ">
-      <span class="slider round" style="
+      
+      <div id="settings-panel" style="
         position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        transition: .3s;
-        border-radius: 24px;
-      "></span>
-    </label>
-  </div>
-  
-  <div id="custom-prompt-section" style="display: none; margin-top: 12px;">
-    <textarea id="custom-prompt-input" placeholder="E.g., 'Write a polite rejection for this interview invitation mentioning schedule conflicts'" style="
-      width: 100%;
-      min-height: 80px;
-      padding: 10px 12px;
-      border: 1px solid #dadce0;
-      border-radius: 6px;
-      font-family: Roboto, Arial, sans-serif;
-      font-size: 13px;
-      resize: vertical;
-      transition: border-color 0.2s ease;
-      box-sizing: border-box;
-      margin-bottom: 8px;
-    "></textarea>
-    
-    <div style="
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 8px;
-    ">
-      <button class="preset-btn" data-prompt="Write a polite rejection for this interview invitation due to other commitments" style="
-        padding: 4px 8px;
-        background: #e8f0fe;
-        border: 1px solid #c1d9fe;
+        top: 88px;
+        right: 32px;
+        width: 340px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        display: none;
+        z-index: 10001;
+        overflow: hidden;
+      ">
+        <div style="
+          padding: 16px 20px;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          background: rgba(248, 250, 252, 0.95);
+        ">
+          <h3 style="
+            margin: 0;
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            font-size: 18px;
+            font-weight: 500;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.82,11.69,4.82,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+            Settings
+          </h3>
+        </div>
+        
+        <div style="padding: 20px;">
+          <div id="user-preferences-status" style="
+            margin-bottom: 16px;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          ">
+            <div id="preferences-icon" style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            "></div>
+            <div style="flex: 1; min-width: 0;">
+              <div id="preferences-title" style="
+                font-family: 'Google Sans', Roboto, Arial, sans-serif;
+                font-size: 14px;
+                font-weight: 500;
+                margin-bottom: 4px;
+                color: #1f2937;
+              "></div>
+              <div id="preferences-subtitle" style="
+                font-size: 12px;
+                color: #4b5563;
+                line-height: 1.4;
+              "></div>
+            </div>
+          </div>
+          
+          <button id="setup-preferences-btn" style="
+            width: 100%;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          ">Setup Personal Signature</button>
+        </div>
+      </div>
+
+      <div id="custom-prompt-toggle" style="
+        margin-bottom: 20px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.95);
         border-radius: 12px;
-        color: #1a73e8;
-        font-size: 11px;
-        font-family: Roboto, Arial, sans-serif;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      ">Reject Interview</button>
-      
-      <button class="preset-btn" data-prompt="Cancel this meeting professionally, apologizing for the inconvenience" style="
-        padding: 4px 8px;
-        background: #e8f0fe;
-        border: 1px solid #c1d9fe;
-        border-radius: 12px;
-        color: #1a73e8;
-        font-size: 11px;
-        font-family: Roboto, Arial, sans-serif;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      ">Cancel Meeting</button>
-      
-      <button class="preset-btn" data-prompt="Postpone this appointment to next week, suggesting alternative times" style="
-        padding: 4px 8px;
-        background: #e8f0fe;
-        border: 1px solid #c1d9fe;
-        border-radius: 12px;
-        color: #1a73e8;
-        font-size: 11px;
-        font-family: Roboto, Arial, sans-serif;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      ">Reschedule</button>
-    </div>
-    
-    <button id="generate-custom-reply" style="
-      width: 100%;
-      padding: 8px 16px;
-      background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
-      border: none;
-      border-radius: 6px;
-      color: white;
-      font-family: 'Google Sans', Roboto, Arial, sans-serif;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    ">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-      </svg>
-      Generate Reply
-    </button>
-  </div>
-</div>
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        ">
+          <div style="flex: 1;">
+            <h3 style="
+              margin: 0 0 4px 0;
+              font-family: 'Google Sans', Roboto, Arial, sans-serif;
+              font-size: 16px;
+              font-weight: 500;
+              color: #1f2937;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            ">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#3b82f6">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+              </svg>
+              Custom Reply Mode
+            </h3>
+            <p style="
+              margin: 0;
+              font-size: 13px;
+              color: #4b5563;
+              line-height: 1.4;
+            ">Tailor AI responses with custom instructions</p>
+          </div>
+          
+          <label class="toggle-switch" style="
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 28px;
+            margin-left: 16px;
+            flex-shrink: 0;
+          ">
+            <input type="checkbox" id="custom-mode-switch" style="
+              opacity: 0;
+              width: 0;
+              height: 0;
+            ">
+            <span class="slider round" style="
+              position: absolute;
+              cursor: pointer;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background-color: #d1d5db;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              border-radius: 28px;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            "></span>
+          </label>
+        </div>
+        
+        <div id="custom-prompt-section" style="display: none; margin-top: 16px;">
+          <textarea id="custom-prompt-input" placeholder="E.g., 'Write a polite rejection for this interview invitation mentioning schedule conflicts'" style="
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            font-family: Roboto, sans-serif;
+            font-size: 14px;
+            resize: vertical;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          "></textarea>
+          
+          <div style="
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin: 12px 0;
+          ">
+            <button class="preset-btn" data-prompt="Write a polite rejection for this interview invitation due to other commitments" style="
+              padding: 6px 12px;
+              background: rgba(59, 130, 246, 0.1);
+              border: 1px solid rgba(59, 130, 246, 0.3);
+              border-radius: 16px;
+              color: #3b82f6;
+              font-size: 12px;
+              font-family: 'Google Sans', Roboto, Arial, sans-serif;
+              cursor: pointer;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            ">Reject Interview</button>
+            
+            <button class="preset-btn" data-prompt="Cancel this meeting professionally, apologizing for the inconvenience" style="
+              padding: 6px 12px;
+              background: rgba(59, 130, 246, 0.1);
+              border: 1px solid rgba(59, 130, 246, 0.3);
+              border-radius: 16px;
+              color: #3b82f6;
+              font-size: 12px;
+              font-family: 'Google Sans', Roboto, Arial, sans-serif;
+              cursor: pointer;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            ">Cancel Meeting</button>
+            
+            <button class="preset-btn" data-prompt="Postpone this appointment to next week, suggesting alternative times" style="
+              padding: 6px 12px;
+              background: rgba(59, 130, 246, 0.1);
+              border: 1px solid rgba(59, 130, 246, 0.3);
+              border-radius: 16px;
+              color: #3b82f6;
+              font-size: 12px;
+              font-family: 'Google Sans', Roboto, Arial, sans-serif;
+              cursor: pointer;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            ">Reschedule</button>
+          </div>
+          
+          <button id="generate-custom-reply" style="
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+          ">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            Generate Reply
+          </button>
+        </div>
+      </div>
       
       <div id="reply-content" style="
-        min-height: 250px;
+        min-height: 280px;
         padding: 24px;
-        background: #f8f9fa;
-        border-radius: 12px;
-        margin-bottom: 24px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 16px;
         font-family: 'Roboto', Arial, sans-serif;
         font-size: 15px;
         line-height: 1.6;
-        color: #202124;
-        border: 1px solid #e8eaed;
+        color: #1f2937;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         position: relative;
         overflow: hidden;
       ">
         <div class="loading-state" style="
           text-align: center;
-          padding: 40px 0;
+          padding: 48px 0;
         ">
           <div style="
-            width: 60px;
-            height: 60px;
+            width: 64px;
+            height: 64px;
             margin: 0 auto 24px;
             position: relative;
           ">
@@ -368,31 +682,31 @@ function createModal() {
               position: absolute;
               width: 100%;
               height: 100%;
-              border: 3px solid #f3f3f3;
+              border: 4px solid rgba(0, 0, 0, 0.05);
               border-radius: 50%;
             "></div>
             <div style="
               position: absolute;
               width: 100%;
               height: 100%;
-              border: 3px solid transparent;
-              border-top: 3px solid #1a73e8;
+              border: 4px solid transparent;
+              border-top: 4px solid #3b82f6;
               border-radius: 50%;
-              animation: spin 1s linear infinite;
+              animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             "></div>
           </div>
           <h3 style="
             margin: 0 0 8px 0;
             font-family: 'Google Sans', Roboto, Arial, sans-serif;
-            font-size: 18px;
-            font-weight: 400;
-            color: #5f6368;
+            font-size: 20px;
+            font-weight: 500;
+            color: #1f2937;
           ">Crafting your reply...</h3>
           <p style="
             margin: 0;
-            color: #80868b;
+            color: #4b5563;
             font-size: 14px;
-          ">AI is analyzing the email and generating a professional response</p>
+          ">AI is analyzing the email and generating a professional reply...</p>
         </div>
       </div>
       
@@ -400,23 +714,23 @@ function createModal() {
         display: flex;
         gap: 16px;
         justify-content: flex-end;
-        padding-top: 8px;
+        padding-top: 12px;
         margin-bottom: 24px;
       ">
         <button id="copy-reply" style="
           padding: 12px 24px;
-          border: 1px solid #dadce0;
-          background: white;
-          color: #1a73e8;
-          border-radius: 8px;
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          background: rgba(255, 255, 255, 0.95);
+          color: #3b82f6;
+          border-radius: 12px;
           font-family: 'Google Sans', Roboto, Arial, sans-serif;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s ease;
           display: flex;
           align-items: center;
           gap: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         ">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
@@ -426,15 +740,15 @@ function createModal() {
         <button id="insert-reply" style="
           padding: 12px 32px;
           border: none;
-          background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
           color: white;
-          border-radius: 8px;
+          border-radius: 12px;
           font-family: 'Google Sans', Roboto, Arial, sans-serif;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
           display: flex;
           align-items: center;
           gap: 8px;
@@ -447,15 +761,15 @@ function createModal() {
         <button id="direct-reply" style="
           padding: 12px 32px;
           border: none;
-          background: linear-gradient(135deg, #34a853 0%, #188038 100%);
+          background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
           color: white;
-          border-radius: 8px;
+          border-radius: 12px;
           font-family: 'Google Sans', Roboto, Arial, sans-serif;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
           display: flex;
           align-items: center;
           gap: 8px;
@@ -467,15 +781,14 @@ function createModal() {
         </button>
       </div>
       
-      <!-- Email Summary Section - Shows at bottom when enabled -->
       <div id="thread-summary-section" style="
         display: none;
-        margin-top: 8px;
-        padding: 20px;
-        background: #fff;
+        margin-top: 12px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.95);
         border-radius: 12px;
-        border: 1px solid #e8eaed;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       ">
         <div style="
           display: flex;
@@ -483,16 +796,15 @@ function createModal() {
           gap: 8px;
           margin-bottom: 16px;
         ">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-</svg>
-
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#3b82f6">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+          </svg>
           <h4 style="
             margin: 0;
             font-family: 'Google Sans', Roboto, Arial, sans-serif;
             font-size: 16px;
             font-weight: 500;
-            color: #202124;
+            color: #1f2937;
           ">Email Thread Summary</h4>
         </div>
         
@@ -500,222 +812,232 @@ function createModal() {
           font-family: Roboto, Arial, sans-serif;
           font-size: 14px;
           line-height: 1.5;
-          color: #202124;
-          max-height: 300px;
+          color: #1f2937;
+          max-height: 320px;
           overflow-y: auto;
-        ">
-          <!-- Summary content will be loaded here -->
-        </div>
+        "></div>
       </div>
-    </div>
-    
-    <style>
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
       
-      @keyframes modalSlideIn {
-        from {
-          transform: translate(-50%, -50%) scale(0.9);
+      <style>
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes modalPopIn {
+          from {
+            transform: translate(-50%, -50%) scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes ripple {
+          0% { transform: scale(0); opacity: 0.5; }
+          100% { transform: scale(4); opacity: 0; }
+        }
+        
+        #close-modal:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        #copy-reply:hover {
+          background: rgba(255, 255, 255, 1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          transform: translateY(-2px);
+        }
+        
+        #insert-reply:hover {
+          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+          transform: translateY(-2px);
+        }
+        
+        #direct-reply:hover {
+          background: linear-gradient(135deg, #1b5e20 0%, #14532d 100%);
+          box-shadow: 0 4px 16px rgba(46, 125, 50, 0.3);
+          transform: translateY(-2px);
+        }
+        
+        #reply-content:not(.loading) .loading-state {
+          display: none;
+        }
+        
+        #setup-preferences-btn:hover {
+          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+          // Add these enhanced styles in the style section of createModal
+#summary-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+#summary-toggle-btn.active {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #1a73e8 !important;
+  border-color: rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+#summary-toggle-btn.active svg {
+  fill: #1a73e8 !important;
+}
+        
+        .toggle-switch .slider:before {
+          position: absolute;
+          content: "";
+          height: 22px;
+          width: 22px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch input:checked + .slider {
+          background-color: #2e7d32;
+        }
+
+        .toggle-switch input:focus + .slider {
+          box-shadow: 0 0 4px rgba(46, 125, 50, 0.5);
+        }
+
+        .toggle-switch input:checked + .slider:before {
+          transform: translateX(20px);
+        }
+
+        .toggle-switch .slider:hover {
+          opacity: 0.9;
+        }
+
+        .toggle-switch input:checked + .slider:hover {
+          background-color: #2a6b2f;
+        }
+
+        #summary-toggle-btn:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        #summary-toggle-btn.active {
+          background: rgba(255, 255, 255, 0.4);
+          box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2), 0 4px 16px rgba(0, 0, 0, 0.25);
+          transform: translateY(-2px);
+        }
+        
+        #settings-toggle-btn:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.15);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .preset-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          background: rgba(59, 130, 246, 0.2);
+          border-color: rgba(59, 130, 246, 0.5);
+        }
+        
+        #generate-custom-reply:hover {
+          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+          transform: translateY(-2px);
+        }
+        
+        #custom-prompt-input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+        }
+        
+        #developer-link:hover {
+          border-bottom-color: rgba(255, 255, 255, 1);
+        }
+
+        button {
+          position: relative;
+          overflow: hidden;
+        }
+
+        button::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 0;
+          height: 0;
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+          transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button:hover::after {
+          width: 200px;
+          height: 200px;
           opacity: 0;
         }
-        to {
-          transform: translate(-50%, -50%) scale(1);
-          opacity: 1;
+      </style>
+    `;
+    
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+    
+    const settingsToggleBtn = document.getElementById("settings-toggle-btn");
+    const settingsPanel = document.getElementById("settings-panel");
+    let settingsOpen = false;
+  
+    if (settingsToggleBtn) {
+      settingsToggleBtn.addEventListener("click", () => {
+        settingsOpen = !settingsOpen;
+        const badge = settingsToggleBtn.querySelector(".exclamation-badge");
+        if (settingsOpen) {
+          settingsPanel.style.display = "block";
+          settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.4)";
+          settingsToggleBtn.style.transform = "rotate(45deg)";
+          if (badge) badge.style.transform = "rotate(-45deg)";
+        } else {
+          settingsPanel.style.display = "none";
+          settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.2)";
+          settingsToggleBtn.style.transform = "rotate(0deg)";
+          if (badge) badge.style.transform = "rotate(0deg)";
         }
+      });
+    }
+    
+    document.addEventListener("click", (e) => {
+      if (!settingsPanel.contains(e.target) && !settingsToggleBtn.contains(e.target)) {
+        settingsOpen = false;
+        settingsPanel.style.display = "none";
+        settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.2)";
+        settingsToggleBtn.style.transform = "rotate(0deg)";
       }
-      
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      
-      #close-modal:hover {
-        background: rgba(255, 255, 255, 0.2) !important;
-        transform: rotate(90deg);
-      }
-      
-      #copy-reply:hover {
-        background: #f8f9fa !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      }
-      
-      #insert-reply:hover {
-        background: linear-gradient(135deg, #1557b0 0%, #1240a0 100%) !important;
-        box-shadow: 0 4px 8px rgba(26, 115, 232, 0.3);
-        transform: translateY(-1px);
-      }
-      
-      #direct-reply:hover {
-        background: linear-gradient(135deg, #188038 0%, #0d652d 100%) !important;
-        box-shadow: 0 4px 8px rgba(52, 168, 83, 0.3);
-        transform: translateY(-1px);
-      }
-      
-      #reply-content:not(.loading) .loading-state {
-        display: none;
-      }
-      
-      /* Toggle Switch Styles - Updated */
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-switch .slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: .3s;
-  border-radius: 24px;
-}
-
-.toggle-switch .slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .3s;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-
-/* Green when checked */
-.toggle-switch input:checked + .slider {
-  background-color: #34a853;
-}
-
-.toggle-switch input:focus + .slider {
-  box-shadow: 0 0 1px #34a853;
-}
-
-.toggle-switch input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-/* Hover effects */
-.toggle-switch .slider:hover {
-  opacity: 0.9;
-}
-
-.toggle-switch input:checked + .slider:hover {
-  background-color: #2d8f47;
-}
-
-      /* Summary button styles */
-      #summary-toggle-btn:hover {
-        background: rgba(255, 255, 255, 0.25) !important;
-        border-color: rgba(255, 255, 255, 0.5) !important;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      }
-      
-      #summary-toggle-btn.active {
-        background: rgba(255, 255, 255, 0.35) !important;
-        border-color: rgba(255, 255, 255, 0.7) !important;
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
-        transform: translateY(-1px);
-      }
-      
-      #summary-toggle-btn.active svg {
-        filter: brightness(1.2);
-      }
-      
-      /* Preset button styles */
-      .preset-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      
-      /* Blue buttons (rejection/cancellation) */
-      .preset-btn[style*="#e8f0fe"]:hover {
-        background: #d2e3fc !important;
-        border-color: #a8c7fa !important;
-      }
-      
-      /* Generate button styles */
-      #generate-custom-reply:hover {
-        background: linear-gradient(135deg, #1557b0 0%, #1240a0 100%) !important;
-        box-shadow: 0 4px 8px rgba(26, 115, 232, 0.3) !important;
-        transform: translateY(-1px);
-      }
-      
-      #generate-custom-reply:active {
-        transform: translateY(0);
-      }
-      
-      /* Custom prompt input styles */
-      #custom-prompt-input:focus {
-        outline: none;
-        border-color: #1a73e8;
-      }
-      
-      /* Scrollbar styling */
-      #reply-content::-webkit-scrollbar,
-      #summary-content::-webkit-scrollbar {
-        width: 8px;
-      }
-      
-      #reply-content::-webkit-scrollbar-track,
-      #summary-content::-webkit-scrollbar-track {
-        background: #f1f3f4;
-        border-radius: 4px;
-      }
-      
-      #reply-content::-webkit-scrollbar-thumb,
-      #summary-content::-webkit-scrollbar-thumb {
-        background: #dadce0;
-        border-radius: 4px;
-      }
-      
-      #reply-content::-webkit-scrollbar-thumb:hover,
-      #summary-content::-webkit-scrollbar-thumb:hover {
-        background: #bdc1c6;
-      }
-      
-      /* Success animation */
-      @keyframes successPulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.1); }
-        100% { transform: scale(1); }
-      }
-      
-      .success-icon {
-        animation: successPulse 0.6s ease-out;
-      }
-      
-      /* Developer link hover effect */
-      #developer-link:hover {
-        border-bottom-color: rgba(255, 255, 255, 0.9) !important;
-      }
-    </style>
-  `;
-  
-  document.body.appendChild(backdrop);
-  document.body.appendChild(modal);
-  
-  // Add event listeners for toggle switch
-  const toggleSwitch = document.getElementById("custom-mode-switch");
-  const customPromptSection = document.getElementById("custom-prompt-section");
-  
-  // Replace the existing toggleSwitch.addEventListener("change", (e) => { ... }) with this:
-
+    });
+    
+    const toggleSwitch = document.getElementById("custom-mode-switch");
+    const customPromptSection = document.getElementById("custom-prompt-section");
+    const customPromptInput = document.getElementById("custom-prompt-input");
+    const replyContent = document.getElementById("reply-content");
+    
+   // Replace the existing toggle switch event listener with this:
 toggleSwitch.addEventListener("change", (e) => {
   const replyContent = document.getElementById("reply-content");
   const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
@@ -723,140 +1045,143 @@ toggleSwitch.addEventListener("change", (e) => {
   const autoCacheKey = `autoreply_${generateCacheKey()}`;
   const customCacheKey = `customreply_${generateCacheKey()}_${customPrompt}`;
   
-  // GET RECEIVER EMAIL HERE - This was missing!
+  // Get receiver email
   const receiverEmail = extractReceiverEmail();
   console.log("📧 Receiver email in toggle:", receiverEmail);
 
   if (e.target.checked) {
     // Enable custom mode
     customPromptSection.style.display = "block";
-
-    if (responseCache.has(customCacheKey)) {
+    
+    // Show the reply content area
+    replyContent.style.display = "block";
+    
+    // Check if we have a cached custom reply with the current prompt
+    if (customPrompt && responseCache.has(customCacheKey)) {
+      console.log("📄 Showing cached custom reply");
       showCachedReply(responseCache.get(customCacheKey));
+    } else if (responseCache.has(autoCacheKey)) {
+      // Show the auto-reply if no custom reply is cached
+      console.log("📄 No custom reply cached, showing auto-reply");
+      showCachedReply(responseCache.get(autoCacheKey));
     } else {
-      replyContent.style.display = "none"; // Wait for user to generate
+      // Clear the reply content and show a message
+      replyContent.innerHTML = `
+        <div style="
+          text-align: center;
+          padding: 40px 20px;
+          color: #5f6368;
+          font-family: 'Google Sans', Roboto, Arial, sans-serif;
+        ">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="#5f6368" style="margin-bottom: 16px;">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
+          <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 400;">Custom Reply Mode</h3>
+          <p style="margin: 0; font-size: 14px;">Enter your custom instructions above and click "Generate Reply"</p>
+        </div>
+      `;
     }
   } else {
     // Enable auto mode
     customPromptSection.style.display = "none";
+    replyContent.style.display = "block";
 
     if (responseCache.has(autoCacheKey)) {
+      console.log("📄 Showing cached auto-reply");
       showCachedReply(responseCache.get(autoCacheKey));
     } else if (emailContent) {
-      // PASS receiverEmail here - This was missing!
+      console.log("🔄 Generating new auto-reply");
       generateReplyWithCache(emailContent.innerText, receiverEmail);
     }
   }
 });
-  
-  // Add event listeners for preset buttons
-  const presetButtons = document.querySelectorAll(".preset-btn");
-  const customPromptInput = document.getElementById("custom-prompt-input");
-  
-  presetButtons.forEach(button => {
-     button.addEventListener("click", () => {
-       customPromptInput.value = button.getAttribute("data-prompt");
-       // Visual feedback
-       button.style.background = "#c8e6c9 !important";
-       button.style.borderColor = "#a5d6a7 !important";
-       setTimeout(() => {
-         button.style.background = "#e8f0fe !important";
-         button.style.borderColor = "#c1d9fe !important";
-       }, 200);
-     });
-   });
-   
-  // Add event listener for Generate Reply button
-  // Replace the existing generateButton.addEventListener("click", () => { ... }) with this:
-
-const generateButton = document.getElementById("generate-custom-reply");
-if (generateButton) {
-  generateButton.addEventListener("click", () => {
-    const customPrompt = customPromptInput.value.trim();
-    if (!customPrompt) {
-      alert("Please enter a custom prompt or select a preset option");
-      return;
+customPromptInput.addEventListener("input", (e) => {
+  if (toggleSwitch.checked) {
+    const customPrompt = e.target.value.trim();
+    const customCacheKey = `customreply_${generateCacheKey()}_${customPrompt}`;
+    
+    if (customPrompt && responseCache.has(customCacheKey)) {
+      console.log("📄 Found cached reply for this prompt");
+      showCachedReply(responseCache.get(customCacheKey));
     }
+  }
+});
     
-    // Show reply content area and generate with custom prompt
-    const replyContent = document.getElementById("reply-content");
-    replyContent.style.display = "block";
+    const presetButtons = document.querySelectorAll(".preset-btn");
+    presetButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        customPromptInput.value = button.getAttribute("data-prompt");
+        button.style.background = "rgba(46, 125, 50, 0.2)";
+        button.style.borderColor = "rgba(46, 125, 50, 0.5)";
+        setTimeout(() => {
+          button.style.background = "rgba(59, 130, 246, 0.1)";
+          button.style.borderColor = "rgba(59, 130, 246, 0.3)";
+        }, 200);
+      });
+    });
     
-    const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
-    if (emailContent) {
-      // GET RECEIVER EMAIL HERE - This was the main missing piece!
-      const receiverEmail = extractReceiverEmail();
-      console.log("📧 Receiver email in custom generate:", receiverEmail);
+    const generateButton = document.getElementById("generate-custom-reply");
+    generateButton.addEventListener("click", () => {
+      const customPrompt = customPromptInput.value.trim();
+      if (!customPrompt) {
+        alert("Please enter a custom prompt or select a preset option");
+        return;
+      }
       
-      // PASS receiverEmail to generateReplyContent - This was missing!
-      generateReplyContent(emailContent.innerText, true, customPrompt, receiverEmail);
-    }
-  });
-} 
-  // Header Summary Button - Generate and show summary data
-  const summaryToggleBtn = document.getElementById("summary-toggle-btn");
-  const threadSummarySection = document.getElementById("thread-summary-section");
-  const summaryContent = document.getElementById("summary-content");
-  let summaryEnabled = false;
-
-  if (summaryToggleBtn) {
+      replyContent.classList.add("loading");
+      const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+      if (emailContent) {
+        const receiverEmail = extractReceiverEmail();
+        generateReplyContent(emailContent.innerText, true, customPrompt, receiverEmail).then(() => {
+          replyContent.classList.remove("loading");
+        });
+      } else {
+        replyContent.innerHTML = `
+          <div style="
+            text-align: center;
+            padding: 48px 0;
+            color: #4b5563;
+          ">
+            <p style="margin: 0; font-size: 14px;">
+              Unable to load email content. Please try again.
+            </p>
+          </div>
+        `;
+        replyContent.classList.remove("loading");
+      }
+    });
+      
+    const summaryToggleBtn = document.getElementById("summary-toggle-btn");
+    const threadSummarySection = document.getElementById("thread-summary-section");
+    const summaryContent = document.getElementById("summary-content");
+    let summaryEnabled = false;
+  
     summaryToggleBtn.addEventListener("click", async () => {
       summaryEnabled = !summaryEnabled;
-      
       if (summaryEnabled) {
         summaryToggleBtn.classList.add("active");
         threadSummarySection.style.display = "block";
-        
-        // Scroll to summary section with smooth animation
         const scrollContainer = document.getElementById("modal-scroll-container");
-        if (scrollContainer) {
-          setTimeout(() => {
-            const targetScrollTop = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-            const startScrollTop = scrollContainer.scrollTop;
-            const distance = targetScrollTop - startScrollTop;
-            const duration = 800; // 800ms for smooth scroll
-            let startTime = null;
-            
-            function smoothScroll(currentTime) {
-              if (startTime === null) startTime = currentTime;
-              const timeElapsed = currentTime - startTime;
-              const progress = Math.min(timeElapsed / duration, 1);
-              
-              // Easing function for smooth animation
-              const easeInOutCubic = progress < 0.5 
-                ? 4 * progress * progress * progress 
-                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-              
-              scrollContainer.scrollTop = startScrollTop + (distance * easeInOutCubic);
-              
-              if (progress < 1) {
-                requestAnimationFrame(smoothScroll);
-              }
-            }
-            
-            requestAnimationFrame(smoothScroll);
-          }, 150);
-        }
+        setTimeout(() => {
+          scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 150);
         
-        // Check cache first
         const cacheKey = `summary_${generateCacheKey()}`;
-        
         if (responseCache.has(cacheKey)) {
-          console.log("📄 Using cached summary");
-          const cachedSummary = responseCache.get(cacheKey);
-          displayThreadSummary(summaryContent, cachedSummary);
+          displayThreadSummary(summaryContent, responseCache.get(cacheKey));
           return;
         }
         
-        // Show loading and generate summary
-        console.log("🔄 Generating new summary");
         summaryContent.innerHTML = `
-          <div class="summary-loading" style="text-align: center; padding: 20px 0;">
-            <div style="width: 32px; height: 32px; margin: 0 auto 12px; position: relative;">
-              <div style="position: absolute; width: 100%; height: 100%; border: 2px solid #f3f3f3; border-radius: 50%;"></div>
-              <div style="position: absolute; width: 100%; height: 100%; border: 2px solid transparent; border-top: 2px solid #1a73e8; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+          <div class="summary-loading" style="text-align: center; padding: 24px;">
+            <div style="width: 36px; height: 36px; margin: 0 auto 12px; position: relative;">
+              <div style="position: absolute; width: 100%; height: 100%; border: 3px solid rgba(0, 0, 0, 0.05); border-radius: 50%;"></div>
+              <div style="position: absolute; width: 100%; height: 100%; border: 3px solid transparent; border-top: 3px solid #3b82f6; border-radius: 50%; animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;"></div>
             </div>
-            <p style="margin: 0; color: #5f6368; font-size: 13px;">Analyzing conversation...</p>
+            <p style="margin: 0; color: #4b5563; font-size: 14px;">Analyzing conversation...</p>
           </div>
         `;
         
@@ -864,160 +1189,143 @@ if (generateButton) {
           const threadData = await extractEmailThread();
           const analysisResult = await analyzeEmailThread(threadData);
           const analysisData = analysisResult.analysis || analysisResult;
-          
           if (analysisData && analysisData.summary) {
             responseCache.set(cacheKey, analysisData);
-            console.log("💾 Cached summary data");
             displayThreadSummary(summaryContent, analysisData);
           } else {
             summaryContent.innerHTML = `
-              <div style="text-align: center; padding: 16px;">
-                <p style="margin: 0; color: #5f6368; font-size: 13px;">No analysis data found.</p>
+              <div style="text-align: center; padding: 20px;">
+                <p style="margin: 0; color: #4b5563; font-size: 14px;">No analysis data found.</p>
               </div>
             `;
           }
-          
         } catch (error) {
-          console.error("Error:", error);
           summaryContent.innerHTML = `
-            <div style="text-align: center; padding: 16px;">
-              <p style="margin: 0; color: #ea4335; font-size: 13px;">Error: ${error.message}</p>
+            <div style="text-align: center; padding: 20px;">
+              <p style="margin: 0; color: #ef4444; font-size: 14px;">Error: ${error.message}</p>
             </div>
           `;
         }
-        
       } else {
         summaryToggleBtn.classList.remove("active");
         threadSummarySection.style.display = "none";
-        
-        // Scroll back to top with smooth animation
         const scrollContainer = document.getElementById("modal-scroll-container");
-        if (scrollContainer) {
-          setTimeout(() => {
-            scrollContainer.scrollTo({
-              top: 0,
-              behavior: 'smooth'
-            });
-          }, 100);
-        }
+        scrollContainer.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
       }
     });
+
+    backdrop.addEventListener("click", () => {
+      backdrop.style.animation = "fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+      modal.style.animation = "modalPopOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+      setTimeout(() => {
+        backdrop.style.display = "none";
+        modal.style.display = "none";
+      }, 400);
+    });
+    
+    document.getElementById("close-modal").addEventListener("click", () => {
+      backdrop.style.animation = "fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+      modal.style.animation = "modalPopOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+      setTimeout(() => {
+        backdrop.style.display = "none";
+        modal.style.display = "none";
+      }, 400);
+    });
+    
+    document.getElementById("copy-reply").addEventListener("click", () => {
+      const replyTextElement = document.getElementById("cached-response-text") || 
+                              document.querySelector("#reply-content div:not(.loading-state)") ||
+                              document.getElementById("reply-content");
+      const replyText = replyTextElement.innerText || replyTextElement.textContent;
+      navigator.clipboard.writeText(replyText).then(() => {
+        const button = document.getElementById("copy-reply");
+        const originalContent = button.innerHTML;
+        button.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+          </svg>
+          Copied!
+        `;
+        button.style.color = "#2563eb";
+        button.style.background = "rgba(255, 255, 255, 0.2)";
+        setTimeout(() => {
+          button.innerHTML = originalContent;
+          button.style.color = "#3b82f6";
+          button.style.background = "rgba(255, 255, 255, 0.95)";
+        }, 2000);
+      });
+    });
+
+    document.getElementById("insert-reply").addEventListener("click", () => {
+  // Select only the reply text, excluding UI elements
+  let replyText = "";
+  const cachedResponse = document.getElementById("cached-response-text");
+  if (cachedResponse) {
+    replyText = cachedResponse.innerText || cachedResponse.textContent;
+  } else {
+    const replyContentDiv = document.querySelector("#reply-content div:not(.loading-state):not([id*='cached-response-buttons'])");
+    replyText = replyContentDiv ? (replyContentDiv.innerText || replyContentDiv.textContent) : "";
   }
 
-  // Add event listeners for modal close
-  backdrop.addEventListener("click", () => {
-    backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
-    modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
+  if (replyText) {
+    insertReplyIntoGmail(replyText.trim());
+    backdrop.style.animation = "fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+    modal.style.animation = "modalPopOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards";
     setTimeout(() => {
       backdrop.style.display = "none";
       modal.style.display = "none";
-    }, 300);
-  });
-  
-  document.getElementById("close-modal").addEventListener("click", () => {
-    backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
-    modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
-    setTimeout(() => {
-      backdrop.style.display = "none";
-      modal.style.display = "none";
-    }, 300);
-  });
-  
-  document.getElementById("copy-reply").addEventListener("click", () => {
-    // Get text from the actual reply content, excluding HTML structure
-    const replyTextElement = document.getElementById("cached-reply-text") || 
-                            document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
-                            document.getElementById("reply-content");
-    
-    const replyText = replyTextElement.innerText || replyTextElement.textContent;
-    
-    navigator.clipboard.writeText(replyText).then(() => {
-      // Show success feedback
-      const button = document.getElementById("copy-reply");
-      const originalContent = button.innerHTML;
-      button.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="success-icon">
-          <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-        </svg>
-        Copied!
-      `;
-      button.style.color = "#34a853";
-      
+    }, 400);
+  } else {
+    alert("No reply content available to insert.");
+  }
+});
+
+    document.getElementById("direct-reply").addEventListener("click", () => {
+      const replyTextElement = document.getElementById("cached-response-text") || 
+                              document.querySelector("#reply-content div:not(.loading-state)") ||
+                              document.getElementById("reply-content");
+      const replyText = replyTextElement.innerText || replyTextElement.textContent;
+      directReplyEmail(replyText);
+      backdrop.style.animation = "fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+      modal.style.animation = "modalPopOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards";
       setTimeout(() => {
-        button.innerHTML = originalContent;
-        button.style.color = "#1a73e8";
-      }, 2000);
+        backdrop.style.display = "none";
+        modal.style.display = "none";
+      }, 400);
     });
-  });
-
-  document.getElementById("insert-reply").addEventListener("click", () => {
-    // Get only the reply text, not the HTML structure
-    const replyTextElement = document.getElementById("cached-reply-text") || 
-                            document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
-                            document.getElementById("reply-content");
     
-    const replyText = replyTextElement.innerText || replyTextElement.textContent;
-    
-    insertReplyIntoGmail(replyText);
-    
-    // Close modal with animation
-    const backdrop = document.getElementById("modal-backdrop");
-    const modal = document.getElementById(MODAL_ID);
-    backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
-    modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
-    setTimeout(() => {
-      backdrop.style.display = "none";
-      modal.style.display = "none";
-    }, 300);
-  });
-
-  document.getElementById("direct-reply").addEventListener("click", () => {
-    // Get only the reply text, not the HTML structure
-    const replyTextElement = document.getElementById("cached-reply-text") || 
-                            document.querySelector("#reply-content div[style*='white-space: pre-wrap']") ||
-                            document.getElementById("reply-content");
-    
-    const replyText = replyTextElement.innerText || replyTextElement.textContent;
-    
-    directReplyEmail(replyText);
-    
-    // Close modal with animation
-    const backdrop = document.getElementById("modal-backdrop");
-    const modal = document.getElementById(MODAL_ID);
-    backdrop.style.animation = "fadeOut 0.3s ease-out forwards";
-    modal.style.animation = "modalSlideOut 0.3s ease-out forwards";
-    setTimeout(() => {
-      backdrop.style.display = "none";
-      modal.style.display = "none";
-    }, 300);
-  });
-  
-  // Add closing animations
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes fadeOut {
-      from { opacity: 1; }
-      to { opacity: 0; }
-    }
-    
-    @keyframes modalSlideOut {
-      from {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
+    const setupPreferencesBtn = document.getElementById("setup-preferences-btn");
+    setupPreferencesBtn.addEventListener("click", () => {
+      if (chrome.runtime && chrome.runtime.openOptionsPage) {
+        chrome.runtime.openOptionsPage();
+      } else {
+        alert("Please click the extension icon in your browser to setup your preferences.");
       }
-      to {
-        transform: translate(-50%, -50%) scale(0.9);
-        opacity: 0;
+    });
+    
+    updateUserPreferencesStatus();
+    
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
       }
-    }
-  `;
-  document.head.appendChild(style);
-  
-  return { modal, backdrop };
+      
+      @keyframes modalPopOut {
+        from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        to { transform: translate(-50%, -50%) scale(0.95); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return { modal, backdrop };
 }
-/**
- * Enhanced function to expand all collapsed parts of the email thread
- */
+
+// Enhanced function to expand all collapsed parts of the email thread
 function expandEntireThread() {
   return new Promise(resolve => {
     console.log("Starting thread expansion...");
@@ -1049,29 +1357,20 @@ function expandEntireThread() {
     
     console.log("Thread expansion initiated");
     
-    // Give more time for DOM to update after expansions
+    // Give time for DOM to update after expansions
     setTimeout(resolve, 1000);
   });
 }
 
-/**
- * Format email content to preserve line breaks and paragraphs
- */
+// Format email content to preserve line breaks and paragraphs
 function formatEmailContent(content) {
   if (!content) return "";
   
   // Add line breaks after common email patterns
   let formatted = content
-    // Add line break after "wrote:" pattern
     .replace(/(wrote:)([^\n])/g, '$1\n$2')
-    
-    // Add line breaks for greeting patterns
     .replace(/(Greetings,|Dear|Hello|Hi|Hey)([^\n])/g, '$1\n$2')
-    
-    // Add line breaks for signature patterns
     .replace(/(Regards,|Sincerely,|Best,|Thanks,|Thank you,)([^\n])/g, '$1\n$2')
-    
-    // Fix line breaks for common separators
     .replace(/(.)(https?:\/\/)/g, '$1\n\n$2');
   
   // Remove excess line breaks
@@ -1080,11 +1379,9 @@ function formatEmailContent(content) {
   return formatted;
 }
 
-/**
- * Main function to extract email thread with support for larger chains
- */
+// Main function to extract email thread
 async function extractEmailThread() {
-  console.log("Starting improved email thread extraction for larger chains...");
+  console.log("Starting improved email thread extraction...");
   
   // First expand the entire thread
   await expandEntireThread();
@@ -1100,24 +1397,17 @@ async function extractEmailThread() {
     completeThreadText: ""
   };
   
-  // APPROACH FOR LARGER CHAINS:
-  // 1. Find all distinct message containers
-  // 2. Extract visible content from each
-  // 3. Look for quoted blocks within each
-  // 4. Sort by position in thread
-  
-  // Get all message containers - try multiple selectors for different Gmail layouts
+  // Get all message containers
   const containerSelectors = [
-    'div[role="listitem"]',                // Main message containers
-    'div.adn.ads',                         // Individual message blocks
-    'div.gs',                              // Message groups
-    'div[data-message-id]',                // Messages with IDs
-    'table.message'                        // Table-based messages (older Gmail)
+    'div[role="listitem"]',
+    'div.adn.ads',
+    'div.gs',
+    'div[data-message-id]',
+    'table.message'
   ];
   
   let allContainers = [];
   
-  // Collect all potential containers
   for (const selector of containerSelectors) {
     const elements = document.querySelectorAll(selector);
     if (elements.length > 0) {
@@ -1131,10 +1421,8 @@ async function extractEmailThread() {
   const processedIds = new Set();
   
   for (const container of allContainers) {
-    // Skip if no height (invisible) or already processed
     if (!container.offsetHeight) continue;
     
-    // Generate a container ID (use data attributes if available, otherwise position)
     const containerId = container.getAttribute('data-message-id') || 
                         container.getAttribute('data-legacy-message-id') || 
                         `pos_${container.offsetTop}`;
@@ -1151,19 +1439,13 @@ async function extractEmailThread() {
   for (let i = 0; i < visibleContainers.length; i++) {
     const container = visibleContainers[i];
     
-    // 1. Extract sender information
     const senderInfo = extractSenderInfo(container);
-    
-    // 2. Extract visible content (excluding quotes)
     const visibleContent = extractVisibleContent(container);
-    
-    // 3. Look for quoted content (previous messages)
     const quotedMessages = extractQuotedMessages(container);
     
-    // 4. Add the container's visible content as a message (if not empty)
     if (visibleContent && visibleContent.trim().length > 15) {
       threadData.emails.push({
-        index: i * 10, // Use multiples of 10 to leave space for quoted messages
+        index: i * 10,
         sender: senderInfo.name,
         senderEmail: senderInfo.email,
         timestamp: senderInfo.timestamp,
@@ -1172,9 +1454,7 @@ async function extractEmailThread() {
       });
     }
     
-    // 5. Add quoted messages (if any)
     quotedMessages.forEach((message, j) => {
-      // Avoid duplicates by checking content similarity
       const isDuplicate = threadData.emails.some(email => 
         email.fullContent && message.content && 
         (email.fullContent.includes(message.content.substring(0, 50)) || 
@@ -1183,7 +1463,7 @@ async function extractEmailThread() {
       
       if (!isDuplicate && message.content.trim().length > 15) {
         threadData.emails.push({
-          index: (i * 10) + j + 1, // Position quoted messages after their container
+          index: (i * 10) + j + 1,
           sender: message.sender,
           senderEmail: message.email,
           timestamp: message.timestamp,
@@ -1194,10 +1474,10 @@ async function extractEmailThread() {
     });
   }
   
-  // Remove duplicate messages
+  // Remove duplicate emails
   threadData.emails = removeDuplicateEmails(threadData.emails);
   
-  // Sort: older messages first (by index)
+  // Sort by index (older messages first)
   threadData.emails.sort((a, b) => a.index - b.index);
   
   // Renumber for display
@@ -1211,14 +1491,11 @@ async function extractEmailThread() {
   });
   
   console.log("COMPLETE THREAD DATA:", threadData);
-  console.log("COMPLETE THREAD TEXT:", threadData.completeThreadText);
   
   return threadData;
 }
 
-/**
- * Extract sender information from a message container
- */
+// Extract sender information from a message container
 function extractSenderInfo(container) {
   let name = "Unknown sender";
   let email = "";
@@ -1233,7 +1510,6 @@ function extractSenderInfo(container) {
   ].filter(Boolean);
   
   for (const element of senderElements) {
-    // Try to get email from attributes
     const emailAttr = element.getAttribute('email') || 
                       element.getAttribute('data-hovercard-id');
     
@@ -1241,18 +1517,14 @@ function extractSenderInfo(container) {
       email = emailAttr;
       name = element.textContent.trim();
       break;
-    } 
-    // If element text contains email pattern
-    else if (element.textContent.includes('@')) {
+    } else if (element.textContent.includes('@')) {
       const emailMatch = element.textContent.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
       if (emailMatch && emailMatch[1]) {
         email = emailMatch[1];
         name = element.textContent.trim();
         break;
       }
-    }
-    // Just get the display name
-    else if (element.textContent.trim()) {
+    } else if (element.textContent.trim()) {
       name = element.textContent.trim();
     }
   }
@@ -1275,11 +1547,8 @@ function extractSenderInfo(container) {
   return { name, email, timestamp };
 }
 
-/**
- * Extract visible content from a message container (excluding quoted content)
- */
+// Extract visible content from a message container
 function extractVisibleContent(container) {
-  // Try various selectors to find content
   const contentSelectors = [
     '.a3s.aiL', '.a3s', '.ii.gt div[dir="ltr"]', 
     '.message-body', '.adP', '.Am.Al.editable'
@@ -1287,11 +1556,9 @@ function extractVisibleContent(container) {
   
   let content = "";
   
-  // Find content elements, excluding quoted sections
   for (const selector of contentSelectors) {
     const elements = container.querySelectorAll(selector);
     for (const element of elements) {
-      // Create a clone to avoid modifying original DOM
       const clone = element.cloneNode(true);
       
       // Remove quoted content from clone
@@ -1309,12 +1576,9 @@ function extractVisibleContent(container) {
     if (content) break;
   }
   
-  // If no content found, try getting all text and clean it
   if (!content) {
-    // Clone to avoid modifying the DOM
     const clone = container.cloneNode(true);
     
-    // Remove quoted sections and UI elements
     const removeSelectors = [
       '.gmail_quote', 'blockquote', '.yahoo_quoted', 
       'button', '.T-I', '.J-J5-Ji'
@@ -1333,57 +1597,47 @@ function extractVisibleContent(container) {
   return content;
 }
 
-/**
- * Extract quoted messages from a container
- */
+// Extract quoted messages from a container
 function extractQuotedMessages(container) {
   const quotedMessages = [];
   
-  // Find all quoted elements
   const quotedElements = container.querySelectorAll('.gmail_quote, blockquote, .yahoo_quoted');
   
   quotedElements.forEach(element => {
     const quoteText = element.innerText.trim();
     
-    // Try to parse sender info and content
     let sender = "Previous sender";
     let email = "";
     let timestamp = "Earlier";
     let content = quoteText;
     
-    // Look for common header patterns
     // Pattern 1: "On [date], [name] <[email]> wrote:"
     const onWroteMatch = quoteText.match(/On .+?, (.+?) <([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)> wrote:/);
     if (onWroteMatch) {
       sender = onWroteMatch[1].trim();
       email = onWroteMatch[2];
       
-      // Extract timestamp from the header
       const dateMatch = quoteText.match(/On (.+?),/);
       if (dateMatch) {
         timestamp = dateMatch[1].trim();
       }
       
-      // Get content after the header
       const headerEnd = quoteText.indexOf("wrote:") + 6;
       if (headerEnd > 6) {
         content = quoteText.substring(headerEnd).trim();
       }
-    }
-    // Pattern 2: "From: [name] <[email]>"
-    else {
+    } else {
+      // Pattern 2: "From: [name] <[email]>"
       const fromMatch = quoteText.match(/From: (.+?) <([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)>/);
       if (fromMatch) {
         sender = fromMatch[1].trim();
         email = fromMatch[2];
         
-        // Extract date from common headers
         const dateMatch = quoteText.match(/Date: (.+?)(?:\r|\n)/);
         if (dateMatch) {
           timestamp = dateMatch[1].trim();
         }
         
-        // Get content after the headers
         const subjectIndex = quoteText.indexOf("Subject:");
         if (subjectIndex > 0) {
           const nextLine = quoteText.indexOf("\n", subjectIndex);
@@ -1394,7 +1648,6 @@ function extractQuotedMessages(container) {
       }
     }
     
-    // If we couldn't extract sender via patterns, just check for email addresses
     if (sender === "Previous sender") {
       const emailMatch = quoteText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
       if (emailMatch) {
@@ -1402,7 +1655,6 @@ function extractQuotedMessages(container) {
       }
     }
     
-    // Add to quoted messages
     quotedMessages.push({
       sender,
       email,
@@ -1414,21 +1666,17 @@ function extractQuotedMessages(container) {
   return quotedMessages;
 }
 
-/**
- * Helper function to remove duplicate emails based on content similarity
- */
+// Helper function to remove duplicate emails
 function removeDuplicateEmails(emails) {
   const uniqueEmails = [];
   const seenContents = new Set();
   
   emails.forEach(email => {
-    // Create a simplified content signature for comparison
     const contentSignature = email.fullContent
-      .substring(0, 100)     // First 100 chars
-      .toLowerCase()         // Case insensitive
-      .replace(/\s+/g, ' '); // Normalize whitespace
+      .substring(0, 100)
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
     
-    // Check if we've seen this content before
     if (!seenContents.has(contentSignature) && contentSignature.length > 10) {
       seenContents.add(contentSignature);
       uniqueEmails.push(email);
@@ -1438,120 +1686,23 @@ function removeDuplicateEmails(emails) {
   return uniqueEmails;
 }
 
-// Make them both the same function
-const extractEmailThreadDirect = extractEmailThread;
-
-/**
- * Clean up email content to remove UI elements, timestamps, and quoted content
- */
-function cleanEmailContent(content, timestamp) {
-  let cleaned = content;
-  
-  // Remove the timestamp from the content if it appears at the beginning
-  if (timestamp && cleaned.startsWith(timestamp)) {
-    cleaned = cleaned.substring(timestamp.length).trim();
-  }
-  
-  // Remove common Gmail interface text
-  const uiTexts = [
-    "Click here to Reply or Forward",
-    "Reply Forward",
-    "Reply all Forward",
-    "Show details",
-    "Hide details",
-    "Reply Reply all Forward"
-  ];
-  
-  uiTexts.forEach(text => {
-    cleaned = cleaned.replace(new RegExp(text, "g"), "");
-  });
-  
-  // Remove quoted content
-  cleaned = removeQuotedContent(cleaned);
-  
-  // Replace multiple line breaks with just two
-  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
-  
-  return cleaned.trim();
-}
-
-/**
- * Helper function to remove quoted content from emails to avoid duplication
- */
-function removeQuotedContent(content) {
-  // Common patterns for quoted content
-  const quotedPatterns = [
-    /On .* wrote:[\s\S]+/i,                  // "On DATE, PERSON wrote:"
-    /From: .*\r?\n[\s\S]+Sent: .*\r?\n/i,    // Outlook style quotes
-    /From:.*\[mailto:.*\][\s\S]+/i,          // Another Outlook format
-    /------+ ?Forwarded message ?------+[\s\S]+/i, // Forwarded messages
-    /------+ ?Original Message ?------+[\s\S]+/i,  // Original message quotes
-    /-{5,}[\s\S]+/,                         // Any 5 or more hyphens followed by content
-    /\>[\s\S]+/                              // Content with > prefix (quoted replies)
-  ];
-  
-  let cleanContent = content;
-  
-  // Try removing each pattern
-  quotedPatterns.forEach(pattern => {
-    cleanContent = cleanContent.replace(pattern, '');
-  });
-  
-  return cleanContent.trim();
-}
-
-/**
- * Helper function to remove duplicate emails based on content similarity
- */
-function removeDuplicateEmails(emails) {
-  const uniqueEmails = [];
-  const seenContents = new Set();
-  
-  emails.forEach(email => {
-    // Create a simplified version of content for comparison (first 100 chars)
-    const contentSignature = email.fullContent.substring(0, 100).toLowerCase().replace(/\s+/g, ' ');
-    
-    // Check if we've seen this content before
-    if (!seenContents.has(contentSignature) && contentSignature.length > 10) {
-      seenContents.add(contentSignature);
-      uniqueEmails.push(email);
-    }
-  });
-  
-  return uniqueEmails;
-}
-
-/**
- * Direct extraction function that tries multiple strategies
- * This can be called directly from your button click handler
- */
-
-
-// Example usage:
-// button.addEventListener("click", async () => {
-//   const threadData = await extractEmailThreadDirect();
-//   console.log("Thread data:", threadData);
-// });
-
-
-function extractReceiverEmail() {
-  // Method A: Check Gmail's recipient span (typically for sent mail)
-  const recipientSpan = document.querySelector('span.g2[email]');
-  if (recipientSpan) {
-    return recipientSpan.getAttribute('email');
+function extractSenderEmail() {
+  // Method A: Look for sender span in the message header
+  const senderSpan = document.querySelector('span.gD[email]');
+  if (senderSpan) {
+    return senderSpan.getAttribute('email');
   }
 
-  // Method B: Look through all span[email] elements and filter likely recipient
+  // Method B: Check for other visible spans with email attribute
   const emailElements = document.querySelectorAll('span[email]');
   for (const el of emailElements) {
-    const email = el.getAttribute('email');
-    const name = el.getAttribute('name') || el.textContent.trim();
-    if (email && name !== email) {
-      return email; // Likely recipient
+    if (el.classList.contains('gD') || el.classList.contains('go')) {
+      const email = el.getAttribute('email');
+      if (email) return email;
     }
   }
 
-  // Method C: Fallback - Look for mailto links in the email header
+  // Method C: Look for mailto links not matching receiver (fallback)
   const mailtoLinks = document.querySelectorAll('a[href^="mailto:"]');
   for (const link of mailtoLinks) {
     const href = link.getAttribute('href');
@@ -1561,25 +1712,49 @@ function extractReceiverEmail() {
     }
   }
 
-  // Nothing found
   return null;
 }
 
+// Extract receiver email from Gmail interface
+function extractReceiverEmail() {
+  // Method A: Check Gmail's recipient span
+  const recipientSpan = document.querySelector('span.g2[email]');
+  if (recipientSpan) {
+    return recipientSpan.getAttribute('email');
+  }
 
+  // Method B: Look through all span[email] elements
+  const emailElements = document.querySelectorAll('span[email]');
+  for (const el of emailElements) {
+    const email = el.getAttribute('email');
+    const name = el.getAttribute('name') || el.textContent.trim();
+    if (email && name !== email) {
+      return email;
+    }
+  }
+
+  // Method C: Look for mailto links
+  const mailtoLinks = document.querySelectorAll('a[href^="mailto:"]');
+  for (const link of mailtoLinks) {
+    const href = link.getAttribute('href');
+    const emailMatch = href.match(/^mailto:([^?]+)/);
+    if (emailMatch) {
+      return emailMatch[1];
+    }
+  }
+
+  return null;
+}
 
 // Function to insert reply into Gmail compose box
 function insertReplyIntoGmail(replyText) {
-  // Click the reply button to open compose area
   const replyButton = document.querySelector('div[role="button"][aria-label*="Reply"]');
   if (replyButton) {
     replyButton.click();
     
-    // Wait for compose area to open
     setTimeout(() => {
-      // Find the compose box (contenteditable div)
       const composeBox = document.querySelector('div[role="textbox"][aria-label*="Message Body"]');
       if (composeBox) {
-        // Insert the reply text
         composeBox.focus();
         document.execCommand('selectAll');
         document.execCommand('insertText', false, replyText);
@@ -1596,24 +1771,18 @@ function insertReplyIntoGmail(replyText) {
 
 // Function to directly send the reply
 function directReplyEmail(replyText) {
-  // Click the reply button to open compose area
   const replyButton = document.querySelector('div[role="button"][aria-label*="Reply"]');
   if (replyButton) {
     replyButton.click();
     
-    // Wait for compose area to open
     setTimeout(() => {
-      // Find the compose box (contenteditable div)
       const composeBox = document.querySelector('div[role="textbox"][aria-label*="Message Body"]');
       if (composeBox) {
-        // Insert the reply text
         composeBox.focus();
         document.execCommand('selectAll');
         document.execCommand('insertText', false, replyText);
         
-        // Wait a moment and then find and click the send button
         setTimeout(() => {
-          // Try multiple selectors for the send button
           const sendSelectors = [
             'div[role="button"][aria-label*="Send"][aria-label*="Ctrl+Enter"]',
             'div[role="button"][aria-label*="Send"]',
@@ -1632,8 +1801,6 @@ function directReplyEmail(replyText) {
           if (sendButton) {
             sendButton.click();
             console.log("✅ Reply sent successfully");
-            
-            // Show success notification
             showSuccessNotification("Reply sent successfully!");
           } else {
             console.error("Could not find send button");
@@ -1682,16 +1849,20 @@ function showSuccessNotification(message) {
   
   document.body.appendChild(notification);
   
-  // Add slide up animation
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes slideUp {
-      from { transform: translateX(-50%) translateY(100%); }
-      to { transform: translateX(-50%) translateY(0); }
-    }
-  `;
+  // Add animations if not already present
   if (!document.head.querySelector('style[data-slideup]')) {
+    const style = document.createElement("style");
     style.setAttribute('data-slideup', 'true');
+    style.textContent = `
+      @keyframes slideUp {
+        from { transform: translateX(-50%) translateY(100%); }
+        to { transform: translateX(-50%) translateY(0); }
+      }
+      @keyframes slideDown {
+        from { transform: translateX(-50%) translateY(0); }
+        to { transform: translateX(-50%) translateY(150%); }
+      }
+    `;
     document.head.appendChild(style);
   }
   
@@ -1704,66 +1875,11 @@ function showSuccessNotification(message) {
   }, 3000);
 }
 
-// Add slide down animation
-const slideDownStyle = document.createElement("style");
-slideDownStyle.textContent = `
-  @keyframes slideDown {
-    from { transform: translateX(-50%) translateY(0); }
-    to { transform: translateX(-50%) translateY(150%); }
-  }
-`;
-if (!document.head.querySelector('style[data-slidedown]')) {
-  slideDownStyle.setAttribute('data-slidedown', 'true');
-  document.head.appendChild(slideDownStyle);
-}
-
-// Update generateReply to accept receiver email
-async function generateReply(emailContent, receiverEmail) {
-  const modalElements = createModal();
-  const modal = modalElements.modal;
-  const backdrop = modalElements.backdrop;
-  
-  // Get the custom mode settings
-  const customModeSwitch = document.getElementById("custom-mode-switch");
-  const customPromptInput = document.getElementById("custom-prompt-input");
-  const replyContent = document.getElementById("reply-content");
-  
-  // Show modal with animation
-  backdrop.style.display = "block";
-  modal.style.display = "block";
-  backdrop.style.animation = "fadeIn 0.3s ease-out";
-  modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
-  
-  // Add receiver email to the modal header if available
-  const modalHeader = modal.querySelector('h2');
-  if (modalHeader && receiverEmail) {
-    const emailInfo = document.createElement('p');
-    emailInfo.style.cssText = `
-      margin: 4px 0 0 0;
-      font-family: Roboto, Arial, sans-serif;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 12px;
-    `;
-    emailInfo.textContent = `Replying to: ${receiverEmail}`;
-    // modalHeader.insertAdjacentElement('afterend', emailInfo);
-  }
-  
-  // If custom mode is enabled, just show the UI and wait for user input
-  if (customModeSwitch && customModeSwitch.checked) {
-    replyContent.style.display = "none";
-    return;
-  }
-  
-  // Otherwise, generate reply automatically
-  replyContent.style.display = "block";
-  generateReplyContent(emailContent, false, null, receiverEmail);
-}
-
 // Enhanced generateReply function with caching
 async function generateReplyWithCache(emailContent, receiverEmail) {
   const cacheKey = `autoreply_${generateCacheKey()}`;
   
-  // Check if we already have a cached response for this thread
+  // Check if we already have a cached response
   if (responseCache.has(cacheKey)) {
     console.log("📄 Using cached auto-reply response");
     const cachedResponse = responseCache.get(cacheKey);
@@ -1779,97 +1895,94 @@ async function generateReplyWithCache(emailContent, receiverEmail) {
     backdrop.style.animation = "fadeIn 0.3s ease-out";
     modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
     
-    // Display the cached response with indicator
-const replyContent = document.getElementById("reply-content");
-replyContent.innerHTML = `
-  <div style="
-    position: relative;
-    background-color: #f8f9fa;
-    border: 1px solid #e8eaed;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 12px 0;
-    font-family: 'Google Sans', Roboto, Arial, sans-serif;
-  ">
-    <div style="
-      position: absolute;
-      top: 8px;
-      right: 12px;
-      background: #34a853;
-      color: white;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 500;
-    ">CACHED</div>
-    
-    <div style="
-      display: flex;
-      align-items: center;
-      margin-bottom: 12px;
-    ">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="#34a853" style="margin-right: 8px;">
-        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-      </svg>
-      <span style="
-        color: #137333;
-        font-weight: 500;
-        font-size: 14px;
-      ">Auto-Reply Generated (Cached)</span>
-    </div>
-    
-    <div id="cached-reply-text" style="
-      background-color: white;
-      border-radius: 6px;
-      padding: 16px;
-      border: 1px solid #e8eaed;
-      white-space: pre-wrap;
-      line-height: 1.5;
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-    ">${cachedResponse}</div>
-    
-    <div style="
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
-    ">
-      <button id="copy-reply-cached" style="
-        background-color: #1a73e8;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-      ">Copy Reply</button>
-      
-      <button id="regenerate-reply-cached" style="
+    // Display the cached response
+    const replyContent = document.getElementById("reply-content");
+    replyContent.innerHTML = `
+      <div style="
+        position: relative;
         background-color: #f8f9fa;
-        color: #3c4043;
-        border: 1px solid #dadce0;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-      ">Regenerate</button>
-    </div>
-  </div>
-`;
+        border: 1px solid #e8eaed;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 12px 0;
+        font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      ">
+        <div style="
+          position: absolute;
+          top: 8px;
+          right: 12px;
+          background: #34a853;
+          color: white;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 500;
+        ">CACHED</div>
+        
+        <div style="
+          display: flex;
+          align-items: center;
+          margin-bottom: 12px;
+        ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#34a853" style="margin-right: 8px;">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          <span style="
+            color: #137333;
+            font-weight: 500;
+            font-size: 14px;
+          ">Auto-Reply Generated (Cached)</span>
+        </div>
+        
+        <div id="cached-reply-text" style="
+          background-color: white;
+          border-radius: 6px;
+          padding: 16px;
+          border: 1px solid #e8eaed;
+          white-space: pre-wrap;
+          line-height: 1.5;
+          font-family: Arial, sans-serif;
+          font-size: 14px;
+        ">${cachedResponse}</div>
+        
+        <div style="
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
+        ">
+          <button id="copy-reply-cached" style="
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+          ">Copy Reply</button>
+          
+          <button id="regenerate-reply-cached" style="
+            background-color: #f8f9fa;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+          ">Regenerate</button>
+        </div>
+      </div>
+    `;
+    
     // Add event listeners for cached response buttons
     setupCachedReplyButtons(cachedResponse, cacheKey, emailContent, receiverEmail);
     return;
   }
 
-  // If not cached, proceed with normal generation and cache the result
+  // If not cached, proceed with normal generation
   console.log("🔄 Generating new auto-reply response");
-  
-  // Call original generateReply function
   await generateReply(emailContent, receiverEmail);
-  
-  // The reply will be cached when generateReplyContent completes successfully
 }
 
 // Helper function to setup button event listeners for cached replies
@@ -1902,8 +2015,39 @@ function setupCachedReplyButtons(replyText, cacheKey, emailContent, receiverEmai
     });
   }
 }
+
+// Update generateReply to accept receiver email
+async function generateReply(emailContent, receiverEmail) {
+  const modalElements = createModal();
+  const modal = modalElements.modal;
+  const backdrop = modalElements.backdrop;
+  
+  // Get the custom mode settings
+  const customModeSwitch = document.getElementById("custom-mode-switch");
+  const replyContent = document.getElementById("reply-content");
+  
+  // Show modal with animation
+  backdrop.style.display = "block";
+  modal.style.display = "block";
+  backdrop.style.animation = "fadeIn 0.3s ease-out";
+  modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
+  
+  // If custom mode is enabled, just show the UI and wait for user input
+  if (customModeSwitch && customModeSwitch.checked) {
+    replyContent.style.display = "none";
+    return;
+  }
+  
+  // Otherwise, generate reply automatically
+  replyContent.style.display = "block";
+  generateReplyContent(emailContent, false, null, receiverEmail);
+}
+
+// Main function to generate reply content
 async function generateReplyContent(emailContent, useCustomPrompt, customPrompt, receiverEmail) {
   const replyContent = document.getElementById("reply-content");
+  const senderEmail = extractSenderEmail() || "";
+  console.log("📧 Extracted sender email:", senderEmail);
   const cacheKey = useCustomPrompt 
     ? `customreply_${generateCacheKey()}_${customPrompt}`
     : `autoreply_${generateCacheKey()}`;
@@ -1925,17 +2069,24 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
       <h3 style="margin: 0 0 8px 0; font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 18px; font-weight: 400; color: #5f6368;">Crafting your reply...</h3>
       <p style="margin: 0; color: #80868b; font-size: 14px;">AI is analyzing the email and generating a professional response</p>
       <p style="margin: 16px 0 0 0; color: #80868b; font-size: 12px;">This may take a few seconds...</p>
-      ${receiverEmail ? `<p style="margin: 8px 0 0 0; color: #1a73e8; font-size: 12px;">Replying to: ${receiverEmail}</p>` : ''}
+      ${senderEmail ? `<p style="margin: 8px 0 0 0; color: #1a73e8; font-size: 12px;">Replying to: ${senderEmail}</p>` : ''}
     </div>
   `;
   replyContent.classList.add("loading");
+
+  const userSignatureInfo = getUserSignatureInfo();
 
   const requestBody = {
     prompt: emailContent,
     useCustomPrompt: Boolean(useCustomPrompt),
     customPrompt: customPrompt || "",
-    receiverEmail: receiverEmail || ""
+    receiverEmail: receiverEmail || "",
+    userPreferences: userSignatureInfo
   };
+  console.log("🔍 Current userPreferences state:", userPreferences);
+  console.log("🔍 Has user preferences:", hasUserPreferences());
+  console.log("🔍 User signature info:", getUserSignatureInfo());
+  console.log("📤 Sending request to generate reply:", requestBody);
 
   const PRIMARY_API = `${BACKEND_URL}/generate`;
   const FALLBACK_API = `${FALLBACK_URL}/generate`;
@@ -1944,7 +2095,7 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
   let usingFallback = false;
 
   try {
-    // Try primary
+    // Try primary API first
     try {
       response = await fetch(PRIMARY_API, {
         method: "POST",
@@ -2005,8 +2156,7 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
 
   } catch (error) {
     console.error("❌ Error generating reply:", error);
-    console.error("Details:", error.message, error.stack);
-
+    
     replyContent.classList.remove("loading");
     replyContent.innerHTML = `
       <div style="text-align: center; padding: 40px 20px;">
@@ -2027,21 +2177,65 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
   }
 }
 
-
-// Helper function to show cached reply content in the reply box
+// Helper function to show cached reply content
 function showCachedReply(replyText) {
   const replyContent = document.getElementById("reply-content");
+  
+  // Use the same structure as cached replies to ensure clean text extraction
   replyContent.innerHTML = `
-    <div id="cached-reply-text" style="
-      white-space: pre-wrap;
-      line-height: 1.5;
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-    ">${replyText}</div>
+    <div style="
+      position: relative;
+      background-color: #f8f9fa;
+      border: 1px solid #e8eaed;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 12px 0;
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+    ">
+      <div style="
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        background: #34a853;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+      ">CACHED</div>
+      
+      <div style="
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+      ">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#34a853" style="margin-right: 8px;">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+        </svg>
+        <span style="
+          color: #137333;
+          font-weight: 500;
+          font-size: 14px;
+        ">Reply Ready</span>
+      </div>
+      
+      <div id="cached-reply-text" style="
+        background-color: white;
+        border-radius: 6px;
+        padding: 16px;
+        border: 1px solid #e8eaed;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      ">${replyText}</div>
+    </div>
   `;
+  
   replyContent.style.display = "block";
 }
 
+// Function to analyze email thread
 async function analyzeEmailThread(threadData) {
   console.log("📊 Sending thread data to analyze-thread endpoint...");
 
@@ -2076,14 +2270,14 @@ async function analyzeEmailThread(threadData) {
 
     console.log(`Analyze-thread response from ${usingFallback ? "fallback" : "primary"} API:`, response.status);
 
-    // Handle 4xx and 5xx errors
-    if (response.status >= 400 && response.status < 600) {
+    // Handle errors
+    if (response.status >= 400) {
       const isClientError = response.status >= 400 && response.status < 500;
       const type = isClientError ? "Client Error" : "Server Error";
       const emoji = isClientError ? "⚠️" : "❌";
       const fallbackMessage = `${emoji} ${type}: ${response.status} ${response.statusText}`;
 
-      // Try fallback if it's a retriable error and not already on fallback
+      // Try fallback if it's a server error and not already on fallback
       if (!usingFallback && response.status >= 500) {
         const fallbackResponse = await fetch(FALLBACK_API, {
           method: 'POST',
@@ -2122,10 +2316,9 @@ function displayReplyContent(replyContent, replyText, usedFallback) {
   setTimeout(() => {
     replyContent.classList.remove("loading");
     
-    // Create reply container with fallback notice if applicable
     let replyHtml = `<div style="white-space: pre-wrap;">${replyText}</div>`;
     
-    // Add a subtle notice if using fallback server
+    // Add fallback notice if applicable
     if (usedFallback) {
       replyHtml += `
         <div style="
@@ -2150,6 +2343,7 @@ function displayReplyContent(replyContent, replyText, usedFallback) {
     replyContent.scrollTop = 0;
   }, 300);
 }
+
 // Function to display thread summary
 function displayThreadSummary(summaryContainer, analysisResult) {
   summaryContainer.style.opacity = "0";
@@ -2303,7 +2497,7 @@ function displayThreadSummary(summaryContainer, analysisResult) {
       summaryHTML = `
         <div style="text-align: center; padding: 24px; color: #5f6368;">
           <p style="font-size: 16px;">🤷‍♂️ No analysis available</p>
-          <p style="font-size: 13px;">We couldn’t extract any meaningful summary from this thread. It may be too short, incomplete, or unsupported.</p>
+          <p style="font-size: 13px;">We couldn't extract any meaningful summary from this thread. It may be too short, incomplete, or unsupported.</p>
         </div>
       `;
     }
@@ -2314,7 +2508,7 @@ function displayThreadSummary(summaryContainer, analysisResult) {
   }, 300);
 }
 
-// Add a function to clear modal content when navigating between emails
+// Function to clear modal content when navigating between emails
 function clearModalContent() {
   const replyContent = document.getElementById("reply-content");
   if (replyContent) {
@@ -2338,12 +2532,12 @@ function clearModalContent() {
   }
   
   // Reset summary toggle and content
-  const summaryModeSwitch = document.getElementById("summary-mode-switch");
+  const summaryToggleBtn = document.getElementById("summary-toggle-btn");
   const threadSummarySection = document.getElementById("thread-summary-section");
   const summaryContent = document.getElementById("summary-content");
   
-  if (summaryModeSwitch) {
-    summaryModeSwitch.checked = false;
+  if (summaryToggleBtn) {
+    summaryToggleBtn.classList.remove("active");
   }
   if (threadSummarySection) {
     threadSummarySection.style.display = "none";
@@ -2355,56 +2549,45 @@ function clearModalContent() {
 
 // Function to inject the button
 function injectButton() {
-  // Check if we're viewing an email (not inbox)
   if (!window.location.href.includes('#inbox/')) {
-    console.log("📧 Not viewing an email, skipping button injection");
     return;
   }
-
-  // Try multiple possible selectors for Gmail's toolbar
+  
   const selectors = [
     'div[gh="tm"]',
     'div[role="toolbar"]',
     'div.ams',
     'div.btC',
     'div.Cr.aqJ',
-    'td.gU.Up > div > div',
+    'td.gU div',
     'div.G-atb',
-    'div.nH.qY > div.nH.aqm > div > div > div > div'
+    'div.nH.qY div'
   ];
   
   let toolbar = null;
-  
   for (const selector of selectors) {
     const elements = document.querySelectorAll(selector);
     for (const el of elements) {
       if (el.offsetHeight > 0 && (el.querySelector('div[role="button"]') || el.querySelector('div[data-tooltip]'))) {
         toolbar = el;
-        console.log(`✅ Found suitable toolbar with selector: ${selector}`);
         break;
       }
     }
     if (toolbar) break;
   }
-
-  if (!toolbar) {
-    console.log("❌ No suitable toolbar found");
-    return;
-  }
-
-  // Check if button already exists
-  if (document.getElementById(BUTTON_ID)) {
-    console.log("✅ Button already exists");
-    return;
-  }
-
-  console.log("🎯 Injecting button...");
   
-  // Create a wrapper div similar to Gmail's button style
+  if (!toolbar) {
+    return;
+  }
+  
+  if (document.getElementById(BUTTON_ID)) {
+    return;
+  }
+  
   const buttonWrapper = document.createElement("div");
   buttonWrapper.style.display = "inline-block";
   buttonWrapper.style.position = "relative";
-  buttonWrapper.style.marginLeft = "8px";
+  buttonWrapper.style.marginLeft = "12px";
   
   const button = document.createElement("div");
   button.id = BUTTON_ID;
@@ -2412,21 +2595,18 @@ function injectButton() {
   button.setAttribute("tabindex", "0");
   button.innerHTML = `
     <div style="
-      position: relative;
-      padding: 8px 20px;
-      text-align: center;
-      border-radius: 100px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 8px 14px;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.8), rgba(91, 33, 182, 0.6));
       color: white;
+      border-radius: 10px;
       font-family: 'Google Sans', Roboto, Arial, sans-serif;
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
-      user-select: none;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 2px 6px rgba(139, 92, 246, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
       overflow: hidden;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
     ">
       <span style="
         position: relative;
@@ -2437,13 +2617,12 @@ function injectButton() {
         gap: 6px;
       ">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="animation: sparkle 2s ease-in-out infinite;">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 18.05l-6.18 3.25L7.85 14.14 2 9.08l6.91-1.01L12 2z"/>
         </svg>
         Auto-Reply
-        <span style="
-          font-size: 16px;
-          animation: bounce 1.5s ease-in-out infinite;
-        ">✨</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="animation: pulse 1.5s ease-in-out infinite;">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 18.05l-6.18 3.25L7.85 14.14 2 9.08l6.91-1.01L12 2z"/>
+        </svg>
       </span>
       <div style="
         position: absolute;
@@ -2452,112 +2631,110 @@ function injectButton() {
         width: 100%;
         height: 100%;
         background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-        transition: left 0.5s;
+        transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       "></div>
     </div>
   `;
   
-  // Add hover effect
   button.onmouseenter = (e) => {
     const innerDiv = e.currentTarget.firstElementChild;
     innerDiv.style.transform = "scale(1.05)";
-    innerDiv.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.6)";
-    innerDiv.style.background = "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)";
-    // Trigger shine effect
-    const shineEffect = innerDiv.querySelector('div[style*="left: -100%"]');
-    if (shineEffect) {
-      shineEffect.style.left = "100%";
-    }
+    innerDiv.style.boxShadow = "0 4px 10px rgba(139, 92, 246, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15)";
+    innerDiv.style.background = "linear-gradient(135deg, rgba(167, 139, 250, 0.8), rgba(124, 58, 237, 0.6))";
+    const shineEffect = innerDiv.querySelector('div[style*="left"]');
+    if (shineEffect) shineEffect.style.left = "100%";
   };
   
   button.onmouseleave = (e) => {
     const innerDiv = e.currentTarget.firstElementChild;
     innerDiv.style.transform = "scale(1)";
-    innerDiv.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
-    innerDiv.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    // Reset shine effect
+    innerDiv.style.boxShadow = "0 2px 6px rgba(139, 92, 246, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)";
+    innerDiv.style.background = "linear-gradient(135deg, rgba(139, 92, 246, 0.8), rgba(91, 33, 182, 0.6))";
     const shineEffect = innerDiv.querySelector('div[style*="left"]');
     if (shineEffect) {
       setTimeout(() => {
         shineEffect.style.left = "-100%";
-      }, 500);
+      }, 600);
     }
   };
   
-  // Add sparkle animation
-  const sparkleStyle = document.createElement("style");
-  sparkleStyle.textContent = `
-    @keyframes sparkle {
-      0% { transform: rotate(0deg) scale(1); }
-      50% { transform: rotate(180deg) scale(1.1); }
-      100% { transform: rotate(360deg) scale(1); }
-    }
-    
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-3px); }
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.7; }
-      100% { opacity: 1; }
-    }
-  `;
   if (!document.head.querySelector('style[data-sparkle]')) {
+    const sparkleStyle = document.createElement("style");
     sparkleStyle.setAttribute('data-sparkle', 'true');
+    sparkleStyle.textContent = `
+      @keyframes sparkle {
+        0% { transform: rotate(0deg) scale(1); opacity: 1; }
+        50% { transform: rotate(180deg) scale(1.2); opacity: 0.8; }
+        100% { transform: rotate(360deg) scale(1); opacity: 1; }
+      }
+      
+      @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.7; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+    `;
     document.head.appendChild(sparkleStyle);
   }
   
-button.addEventListener("click", async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  console.log("🚀 Auto-Reply button clicked!");
-  
-  // Extract receiver's email address
-  const receiverEmail = extractReceiverEmail();
-  console.log("📧 Receiver's email:", receiverEmail);
-
-  const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
-  if (emailContent) {
-    const emailText = emailContent.innerText;
-    console.log("📧 Email content found:", emailText.substring(0, 100) + "...");
+  button.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     
-    // Extract email thread for analysis (background operation with caching)
-    console.log("🔍 Extracting email thread for analysis...");
-    try {
-      const cacheKey = `summary_${generateCacheKey()}`;
-      
-      // Only extract and analyze thread if not already cached
-      if (!responseCache.has(cacheKey)) {
-        const threadData = await extractEmailThread();
-        console.log("📊 Thread extracted, sending to analyze-thread endpoint...");
-        
-        // Send thread data to analyze-thread endpoint (background operation)
-        analyzeEmailThread(threadData).then(result => {
-          if (result && result.analysis) {
-            responseCache.set(cacheKey, result.analysis);
-            console.log("💾 Cached summary data from auto-reply");
-          }
-        }).catch(error => {
-          console.error("Background thread analysis failed:", error);
-        });
-      } else {
-        console.log("📄 Thread analysis already cached");
-      }
-      
-    } catch (error) {
-      console.error("Error extracting thread:", error);
+    const receiverEmail = extractReceiverEmail();
+    if (userPreferences === null) {
+      await loadUserPreferences();
     }
+    
+    const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+    if (emailContent) {
+      const emailText = emailContent.innerText;
+      try {
+        const cacheKey = `summary_${generateCacheKey()}`;
+        if (!responseCache.has(cacheKey)) {
+          const threadData = await extractEmailThread();
+          analyzeEmailThread(threadData).then(result => {
+            if (result && result.analysis) {
+              responseCache.set(cacheKey, result.analysis);
+            }
+          }).catch(error => {
+            console.error("Background thread analysis failed:", error);
+          });
+        }
+        await generateReplyWithCache(emailText, receiverEmail);
+      } catch (error) {
+        console.error("Error extracting thread:", error);
+        const replyContent = document.getElementById("reply-content");
+        replyContent.innerHTML = `
+          <div style="
+            text-align: center;
+            padding: 48px 0;
+            color: #ef4444;
+          ">
+            <p style="margin: 0; font-size: 14px;">
+              Error loading email content. Please try again.
+            </p>
+          </div>
+        `;
+        replyContent.classList.remove("loading");
+      }
+    } else {
+      const replyContent = document.getElementById("reply-content");
+      replyContent.innerHTML = `
+        <div style="
+          text-align: center;
+          padding: 48px 0;
+          color: #ef4444;
+        ">
+          <p style="margin: 0; font-size: 14px;">
+            Could not find email content. Please ensure you're viewing an email.
+          </p>
+        </div>
+      `;
+      replyContent.classList.remove("loading");
+    }
+  }, true);
 
-    // Generate reply with caching
-    await generateReplyWithCache(emailText, receiverEmail);
-  } else {
-    alert("Could not find email content. Please make sure you're viewing an email.");
-  }
-}, true);
-
-  // Add keyboard support
   button.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -2567,7 +2744,6 @@ button.addEventListener("click", async (e) => {
   
   buttonWrapper.appendChild(button);
   toolbar.appendChild(buttonWrapper);
-  console.log("✅ Auto-Reply button injected successfully");
 }
 
 // Function to check and inject button
@@ -2585,18 +2761,28 @@ function checkAndInjectButton() {
     if (existingButton) {
       existingButton.parentElement.remove();
     }
+    
+    // Reset user preferences on navigation
+    userPreferences = null;
+    console.log("🔄 Initializing user preferences...");
+    loadUserPreferences().then(() => {
+      console.log("✅ User preferences initialization completed");
+    });
   }
-  
+
   injectButton();
 }
 
 // Start checking
 checkInterval = setInterval(checkAndInjectButton, 500);
 
-// Also listen for Gmail's navigation events
+// Listen for hash changes (Gmail navigation)
 if (window.addEventListener) {
   window.addEventListener('hashchange', () => {
     console.log("🔄 Hash changed, checking for button injection...");
+    // Reset user preferences on navigation
+    userPreferences = null;
+    loadUserPreferences();
     setTimeout(checkAndInjectButton, 100);
   });
 }
@@ -2609,6 +2795,17 @@ const observer = new MutationObserver((mutations) => {
     checkAndInjectButton();
   }
 });
+
+// Listen for storage changes to update preferences in real-time
+if (chrome && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    console.log("🔄 Storage changed, reloading user preferences...", changes);
+    loadUserPreferences().then(() => {
+      // Update modal if it's open
+      updateUserPreferencesStatus();
+    });
+  });
+}
 
 // Start observing the document body for changes
 observer.observe(document.body, {

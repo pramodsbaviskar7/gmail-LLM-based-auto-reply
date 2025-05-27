@@ -3,7 +3,7 @@
   "name": "RespondX",
   "version": "1.0.4",
   "description": "Generate smart email replies and thread summaries with AI. Boost productivity with Gmail's next-gen communication.",
-  "permissions": [],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://mail.google.com/*",
     "https://gmail-llm-based-auto-reply.vercel.app/*",

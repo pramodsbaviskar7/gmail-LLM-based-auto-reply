@@ -160,24 +160,117 @@
       margin: 20px 0;
     }
     
+    /* Enhanced toggle section with better interactivity */
     .toggle-section {
       cursor: pointer;
       user-select: none;
+      transition: color 0.2s ease;
+      padding: 4px 0;
+      border-radius: 4px;
     }
     
     .toggle-section:hover {
       color: #1a73e8;
+      background-color: rgba(26, 115, 232, 0.04);
     }
     
+    .toggle-section:active {
+      background-color: rgba(26, 115, 232, 0.08);
+    }
+    
+    /* Add focus outline for accessibility */
+    .toggle-section:focus-visible {
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
+    }
+    
+    /* Ensure form is properly hidden initially with smooth animation */
     #customSignatureForm {
       display: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      margin-top: 12px;
     }
     
+    /* Show form with smooth fade-in when displayed */
+    #customSignatureForm[style*="block"] {
+      opacity: 1;
+    }
+    
+    /* Enhanced success message styling */
     .success-message {
       color: #34a853;
       font-size: 14px;
       margin-top: 8px;
       display: none;
+      padding: 8px 12px;
+      background-color: rgba(52, 168, 83, 0.1);
+      border-radius: 4px;
+      border-left: 3px solid #34a853;
+      transition: all 0.2s ease;
+    }
+    
+    /* Error message styling */
+    .success-message.error {
+      color: #ea4335;
+      background-color: rgba(234, 67, 53, 0.1);
+      border-left-color: #ea4335;
+    }
+    
+    /* Improved form styling */
+    .form-group {
+      margin-bottom: 16px;
+      position: relative;
+    }
+    
+    /* Add subtle focus ring to inputs */
+    input[type="text"]:focus,
+    input[type="email"]:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+    
+    /* Improve button hover states */
+    .primary-button:hover {
+      background: #1557b0;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .secondary-button:hover {
+      background: #f8f9fa;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Add loading state for buttons */
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    /* Improve overall visual hierarchy */
+    .section:last-of-type {
+      margin-bottom: 0;
+    }
+    
+    /* Add subtle animation to status dot */
+    .status-dot {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 6px rgba(52, 168, 83, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(52, 168, 83, 0);
+      }
     }
   </style>
 </head>
@@ -206,7 +299,7 @@
   </div>
   
   <div class="section">
-    <div class="section-title toggle-section" id="toggleCustomSignature">
+    <div class="section-title toggle-section" id="toggleCustomSignature" tabindex="0">
       ▼ Customize Signature (Optional)
     </div>
     <div class="help-text">Set your own signature information for generated replies</div>

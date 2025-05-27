@@ -395,12 +395,12 @@ try:
 except ImportError:
     logger.info("Using default configuration")
 
-# Request models
 class PromptRequest(BaseModel):
     prompt: str = Field(...)
     useCustomPrompt: bool = False
     customPrompt: Optional[str] = Field(None, max_length=5000)
     receiverEmail: Optional[str] = None
+    userPreferences: Optional[Dict[str, Any]] = None  # ADD THIS LINE
     
     @validator('prompt')
     def validate_prompt(cls, v):
@@ -655,15 +655,21 @@ async def make_groq_request(payload: dict, max_retries: int = 3) -> dict:
                     await asyncio.sleep(min(2 ** attempt, 10))
     
     raise HTTPException(status_code=503, detail="Service unavailable after all retries")
-# API Endpoints
+
 @app.post("/generate")
 async def generate_reply(request: Request, prompt_request: PromptRequest, background_tasks: BackgroundTasks):
     try:
         # Sanitize inputs
         prompt_text = sanitize_input(prompt_request.prompt)
         custom_prompt = sanitize_input(prompt_request.customPrompt) if prompt_request.customPrompt else None
-        
-        # Check cache first
+        # Now you can access userPreferences
+        if prompt_request.userPreferences:
+            user_prefs = prompt_request.userPreferences
+            print(f"User preferences: {user_prefs}")
+            print(f"User email: {user_prefs.email if hasattr(user_prefs, 'email') else user_prefs.get('email')}")
+            print(f"User name: {user_prefs.full_name if hasattr(user_prefs, 'full_name') else user_prefs.get('full_name')}")
+        else:
+            print("No user preferences provided")
         cache_key = get_cache_key(prompt_request.dict())
         cached_response = response_cache.get(cache_key)
         
@@ -671,20 +677,29 @@ async def generate_reply(request: Request, prompt_request: PromptRequest, backgr
             logger.info("Cache hit for request")
             return {"reply": cached_response, "cached": True}
         
-        # Determine user configuration
-        user_identity = prompt_request.receiverEmail or ""
-        logger.info(f"mail received:\n{user_identity}")
-        if user_identity and ("pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity):
-            selected_user_info = USER_INFO
-
-        else:
-            
+        # Determine user configuration - Use userPreferences if available
+        if prompt_request.userPreferences and prompt_request.userPreferences.get('hasPreferences'):
+            # Use userPreferences from the request
+            user_prefs = prompt_request.userPreferences
             selected_user_info = {
-    "full_name": "Your Name",
-    "email": "your.email@company.com",
-    "linkedin": "https://www.linkedin.com/in/yourprofile",
-    "mobile": "+1 (555) 123-4567"
-}
+                "full_name": user_prefs.get('full_name') or "Your Name",
+                "email": user_prefs.get('email') or "your.email@company.com", 
+                "linkedin": user_prefs.get('linkedin') or "https://www.linkedin.com/in/yourprofile",
+                "mobile": user_prefs.get('mobile') or "+1 (555) 123-4567"
+            }
+        else:
+            # Fallback to existing logic
+            user_identity = prompt_request.receiverEmail or ""
+            logger.info(f"mail received:\n{user_identity}")
+            if user_identity and ("pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity):
+                selected_user_info = USER_INFO
+            else:
+                selected_user_info = {
+        "full_name": "Your Name",
+        "email": "your.email@company.com",
+        "linkedin": "https://www.linkedin.com/in/yourprofile",
+        "mobile": "+1 (555) 123-4567"
+    }
         import textwrap
 
         signature_template = textwrap.dedent(f"""\
@@ -787,7 +802,7 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-
+    
 @app.post("/analyze-thread")
 async def analyze_email_thread(request: Request, thread_request: ThreadAnalysisRequest):
     try:
