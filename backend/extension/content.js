@@ -73,6 +73,7 @@ async function loadUserPreferences() {
 
 
 
+
 // Function to get user signature information
 function getUserSignatureInfo() {
   if (!hasUserPreferences()) {
@@ -1235,37 +1236,40 @@ customPromptInput.addEventListener("input", (e) => {
     });
     
     document.getElementById("copy-reply").addEventListener("click", () => {
-      const replyTextElement = document.getElementById("cached-response-text") || 
-                              document.querySelector("#reply-content div:not(.loading-state)") ||
-                              document.getElementById("reply-content");
-      const replyText = replyTextElement.innerText || replyTextElement.textContent;
-      navigator.clipboard.writeText(replyText).then(() => {
-        const button = document.getElementById("copy-reply");
-        const originalContent = button.innerHTML;
-        button.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-          </svg>
-          Copied!
-        `;
-        button.style.color = "#2563eb";
-        button.style.background = "rgba(255, 255, 255, 0.2)";
-        setTimeout(() => {
-          button.innerHTML = originalContent;
-          button.style.color = "#3b82f6";
-          button.style.background = "rgba(255, 255, 255, 0.95)";
-        }, 2000);
-      });
-    });
+  const replyTextElement = document.getElementById("cached-reply-text") || 
+                          document.querySelector("#reply-content > div[style*='white-space: pre-wrap']") ||
+                          document.querySelector("#reply-content div:not(.loading-state):not([style*='background: #34a853'])");
+  
+  const replyText = replyTextElement ? (replyTextElement.innerText || replyTextElement.textContent) : "";
+  
+  navigator.clipboard.writeText(replyText).then(() => {
+    const button = document.getElementById("copy-reply");
+    const originalContent = button.innerHTML;
+    button.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+      </svg>
+      Copied!
+    `;
+    button.style.color = "#2563eb";
+    button.style.background = "rgba(255, 255, 255, 0.2)";
+    setTimeout(() => {
+      button.innerHTML = originalContent;
+      button.style.color = "#3b82f6";
+      button.style.background = "rgba(255, 255, 255, 0.95)";
+    }, 2000);
+  });
+});
+
 
     document.getElementById("insert-reply").addEventListener("click", () => {
   // Select only the reply text, excluding UI elements
   let replyText = "";
-  const cachedResponse = document.getElementById("cached-response-text");
+  const cachedResponse = document.getElementById("cached-reply-text");
   if (cachedResponse) {
     replyText = cachedResponse.innerText || cachedResponse.textContent;
   } else {
-    const replyContentDiv = document.querySelector("#reply-content div:not(.loading-state):not([id*='cached-response-buttons'])");
+    const replyContentDiv = document.querySelector("#reply-content > div[style*='white-space: pre-wrap']");
     replyText = replyContentDiv ? (replyContentDiv.innerText || replyContentDiv.textContent) : "";
   }
 
@@ -1283,18 +1287,20 @@ customPromptInput.addEventListener("input", (e) => {
 });
 
     document.getElementById("direct-reply").addEventListener("click", () => {
-      const replyTextElement = document.getElementById("cached-response-text") || 
-                              document.querySelector("#reply-content div:not(.loading-state)") ||
-                              document.getElementById("reply-content");
-      const replyText = replyTextElement.innerText || replyTextElement.textContent;
-      directReplyEmail(replyText);
-      backdrop.style.animation = "fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards";
-      modal.style.animation = "modalPopOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards";
-      setTimeout(() => {
-        backdrop.style.display = "none";
-        modal.style.display = "none";
-      }, 400);
-    });
+  const replyTextElement = document.getElementById("cached-reply-text") || 
+                          document.querySelector("#reply-content > div[style*='white-space: pre-wrap']") ||
+                          document.querySelector("#reply-content div:not(.loading-state):not([style*='background: #34a853'])");
+  
+  const replyText = replyTextElement ? (replyTextElement.innerText || replyTextElement.textContent) : "";
+  
+  directReplyEmail(replyText);
+  backdrop.style.animation = "fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+  modal.style.animation = "modalPopOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards";
+  setTimeout(() => {
+    backdrop.style.display = "none";
+    modal.style.display = "none";
+  }, 400);
+});
     
     const setupPreferencesBtn = document.getElementById("setup-preferences-btn");
     setupPreferencesBtn.addEventListener("click", () => {
@@ -2177,8 +2183,18 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
 }
 
 // Helper function to show cached reply content
+// Helper function to show cached reply content
 function showCachedReply(replyText) {
   const replyContent = document.getElementById("reply-content");
+  
+  // Get current cache key for regeneration
+  const toggleSwitch = document.getElementById("custom-mode-switch");
+  const customPromptInput = document.getElementById("custom-prompt-input");
+  const isCustomMode = toggleSwitch && toggleSwitch.checked;
+  const customPrompt = customPromptInput ? customPromptInput.value.trim() : "";
+  const cacheKey = isCustomMode && customPrompt 
+    ? `customreply_${generateCacheKey()}_${customPrompt}`
+    : `autoreply_${generateCacheKey()}`;
   
   // Use the same structure as cached replies to ensure clean text extraction
   replyContent.innerHTML = `
@@ -2215,7 +2231,7 @@ function showCachedReply(replyText) {
           color: #137333;
           font-weight: 500;
           font-size: 14px;
-        ">Reply Ready</span>
+        ">Reply Ready (Cached)</span>
       </div>
       
       <div id="cached-reply-text" style="
@@ -2228,10 +2244,83 @@ function showCachedReply(replyText) {
         font-family: Arial, sans-serif;
         font-size: 14px;
       ">${replyText}</div>
+      
+      <div style="
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+      ">
+        <button id="copy-reply-cached" style="
+          background-color: #1a73e8;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        ">Copy Reply</button>
+        
+        <button id="regenerate-reply-cached" style="
+          background-color: #f8f9fa;
+          color: #3c4043;
+          border: 1px solid #dadce0;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        ">Regenerate</button>
+      </div>
     </div>
   `;
   
   replyContent.style.display = "block";
+  
+  // Add event listeners for the buttons
+  const copyBtn = document.getElementById("copy-reply-cached");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(replyText).then(() => {
+        copyBtn.textContent = "Copied!";
+        copyBtn.style.backgroundColor = "#34a853";
+        setTimeout(() => {
+          copyBtn.textContent = "Copy Reply";
+          copyBtn.style.backgroundColor = "#1a73e8";
+        }, 2000);
+      });
+    });
+  }
+  
+  // Add regenerate functionality
+  const regenerateBtn = document.getElementById("regenerate-reply-cached");
+  if (regenerateBtn) {
+    regenerateBtn.addEventListener("click", () => {
+      // Clear cache for this reply
+      responseCache.delete(cacheKey);
+      console.log("🗑️ Cleared cached reply, regenerating...");
+      
+      // Get email content and receiver email
+      const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+      const receiverEmail = extractReceiverEmail();
+      
+      if (emailContent) {
+        if (isCustomMode && customPrompt) {
+          // Regenerate custom reply
+          const replyContent = document.getElementById("reply-content");
+          replyContent.classList.add("loading");
+          generateReplyContent(emailContent.innerText, true, customPrompt, receiverEmail).then(() => {
+            replyContent.classList.remove("loading");
+          });
+        } else {
+          // Regenerate auto-reply
+          generateReply(emailContent.innerText, receiverEmail);
+        }
+      }
+    });
+  }
 }
 
 // Function to analyze email thread
