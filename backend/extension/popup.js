@@ -106,10 +106,11 @@ document.addEventListener('DOMContentLoaded', function() {
           if (successMessage) {
             console.log('Showing success message');
             successMessage.style.display = 'block';
+            
+            // Auto-close popup after 2 seconds
             setTimeout(() => {
-              successMessage.style.display = 'none';
-              console.log('Success message hidden');
-            }, 3000);
+              window.close();
+            }, 2000);
           } else {
             console.error('Success message element not found');
           }
@@ -149,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
               successMessage.style.display = 'none';
               successMessage.textContent = '✓ Preferences saved successfully!';
-            }, 3000);
+            }, 4000);
           }
         });
       } else {
