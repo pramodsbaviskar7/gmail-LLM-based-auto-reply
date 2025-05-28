@@ -2,8 +2,7 @@ console.log("✅ Gmail Auto LLM Reply: Content script loaded");
 
 const BUTTON_ID = "auto-reply-button";
 const MODAL_ID = "auto-reply-modal";
-const BACKEND_URL = "http://localhost:8000"; // Change to local for debugging
-// const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
+const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
 const FALLBACK_URL = "https://gmail-llm-based-auto-reply.onrender.com";
 let checkInterval = null;
 let currentUrl = window.location.href;
@@ -2620,7 +2619,7 @@ function injectButton() {
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 18.05l-6.18 3.25L7.85 14.14 2 9.08l6.91-1.01L12 2z"/>
         </svg>
         Auto-Reply
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="animation: pulse 1.5s ease-in-out infinite;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="animation: sparkle 2s ease-in-out infinite;">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 18.05l-6.18 3.25L7.85 14.14 2 9.08l6.91-1.01L12 2z"/>
         </svg>
       </span>
@@ -2666,12 +2665,6 @@ function injectButton() {
         0% { transform: rotate(0deg) scale(1); opacity: 1; }
         50% { transform: rotate(180deg) scale(1.2); opacity: 0.8; }
         100% { transform: rotate(360deg) scale(1); opacity: 1; }
-      }
-      
-      @keyframes pulse {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.1); opacity: 0.7; }
-        100% { transform: scale(1); opacity: 1; }
       }
     `;
     document.head.appendChild(sparkleStyle);
