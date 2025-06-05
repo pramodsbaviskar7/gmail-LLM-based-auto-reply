@@ -268,141 +268,161 @@ function createModal() {
   `;
   
   modal.innerHTML = `
+  <div style="
+    background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);
+    padding: 28px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  ">
     <div style="
-      background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);
-      padding: 28px 32px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      position: relative;
-      overflow: hidden;
+      gap: 16px;
+      z-index: 2;
     ">
       <div style="
+        width: 48px;
+        height: 48px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
         display: flex;
         align-items: center;
-        gap: 16px;
-        z-index: 2;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       ">
-        <div style="
-          width: 48px;
-          height: 48px;
-          background: rgba(255, 255, 255, 0.15);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        ">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-          </svg>
-        </div>
-        <div>
-          <h2 style="
-            margin: 0;
-            font-family: 'Google Sans', Roboto, Arial, sans-serif;
-            color: white;
-            font-size: 26px;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-          ">AI Email Assistant</h2>
-          <p style="
-            margin: 4px 0 0 0;
-            font-family: Roboto, Arial, sans-serif;
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 14px;
-          ">Crafted by 
-            <a href="https://www.linkedin.com/in/pramodsbaviskar/" 
-               target="_blank" 
-               rel="noopener noreferrer"
-               id="developer-link"
-               style="
-                 color: white;
-                 text-decoration: none;
-                 font-weight: 500;
-                 border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-                 transition: border-color 0.3s ease;
-               ">Pramod Baviskar</a>
-          </p>
-        </div>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+          <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+        </svg>
       </div>
+      <div>
+        <h2 style="
+          margin: 0;
+          font-family: 'Google Sans', Roboto, Arial, sans-serif;
+          color: white;
+          font-size: 26px;
+          font-weight: 500;
+          letter-spacing: 0.5px;
+        ">AI Email Assistant</h2>
+        <p style="
+          margin: 4px 0 0 0;
+          font-family: Roboto, Arial, sans-serif;
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 14px;
+        ">Crafted by 
+          <a href="https://www.linkedin.com/in/pramodsbaviskar/" 
+             target="_blank" 
+             rel="noopener noreferrer"
+             id="developer-link"
+             style="
+               color: white;
+               text-decoration: none;
+               font-weight: 500;
+               border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+               transition: border-color 0.3s ease;
+             ">Pramod Baviskar</a>
+        </p>
+      </div>
+    </div>
+    
+    <div style="display: flex; align-items: center; gap: 12px; z-index: 2;">
+      <button id="dark-mode-toggle" style="
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        padding: 6px;
+        border-radius: 10px;
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        margin-right: 4px;
+      ">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="theme-icon">
+  <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>
+</svg>
+      </button>
       
-      <div style="display: flex; align-items: center; gap: 12px; z-index: 2;">
-        <div style="position: relative;">
-          <button id="settings-toggle-btn" style="
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            padding: 10px;
-            border-radius: 12px;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          ">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.82,11.69,4.82,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
-            </svg>
-          </button>
-        </div>
-        
-        <button id="summary-toggle-btn" style="
+      <div style="position: relative;">
+        <button id="settings-toggle-btn" style="
           background: rgba(255, 255, 255, 0.2);
           border: none;
-          padding: 10px 16px;
+          padding: 10px;
           border-radius: 12px;
           color: white;
-          font-family: 'Google Sans', Roboto, Arial, sans-serif;
-          font-size: 13px;
-          font-weight: 500;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        ">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-          </svg>
-          Email Summary
-        </button>
-        
-        <button id="close-modal" style="
-          background: rgba(255, 255, 255, 0.15);
-          border: none;
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          cursor: pointer;
-          color: white;
-          font-size: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          width: 40px;
+          height: 40px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         ">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.82,11.69,4.82,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
           </svg>
         </button>
       </div>
-      <div style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.2), transparent 50%);
-        pointer-events: none;
-      "></div>
+      
+      <button id="summary-toggle-btn" style="
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        padding: 10px 16px;
+        border-radius: 12px;
+        color: white;
+        font-family: 'Google Sans', Roboto, Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      ">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+        </svg>
+        Email Summary
+      </button>
+      
+      <button id="close-modal" style="
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        cursor: pointer;
+        color: white;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      ">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
     </div>
-    
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.2), transparent 50%);
+      pointer-events: none;
+    "></div>
+  </div>
     <div style="
       padding: 32px;
       max-height: calc(90vh - 200px);
@@ -428,7 +448,8 @@ function createModal() {
           padding: 16px 20px;
           border-bottom: 1px solid rgba(0, 0, 0, 0.08);
           background: rgba(248, 250, 252, 0.95);
-        ">
+        " class="settings-panel-header">
+
           <h3 style="
             margin: 0;
             font-family: 'Google Sans', Roboto, Arial, sans-serif;
@@ -711,27 +732,32 @@ function createModal() {
       </div>
       
       <div style="
-        display: flex;
-        gap: 16px;
-        justify-content: flex-end;
-        padding-top: 12px;
-        margin-bottom: 24px;
-      ">
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  padding-top: 12px;
+  margin-bottom: 24px;
+  width: 100%;
+">
         <button id="copy-reply" style="
-          padding: 12px 24px;
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          background: rgba(255, 255, 255, 0.95);
-          color: #3b82f6;
-          border-radius: 12px;
-          font-family: 'Google Sans', Roboto, Arial, sans-serif;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        ">
+  padding: 12px 20px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  color: #3b82f6;
+  border-radius: 12px;
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex: 1;
+  max-width: 200px;
+">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
           </svg>
@@ -995,43 +1021,127 @@ function createModal() {
           height: 200px;
           opacity: 0;
         }
+          /* Dark mode styles */
+.dark-mode {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3d3d3d;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --border-color: #4d4d4d;
+  --header-bg: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+}
+
+.dark-mode #auto-reply-modal {
+  background: rgba(26, 26, 26, 0.95) !important;
+}
+
+.dark-mode .modal-header {
+  background: var(--header-bg) !important;
+}
+
+.dark-mode #modal-scroll-container {
+  background: linear-gradient(to bottom, rgba(26, 26, 26, 0.95), rgba(45, 45, 45, 0.95)) !important;
+}
+
+.dark-mode #settings-panel {
+  background: rgba(45, 45, 45, 0.95) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.dark-mode #custom-prompt-toggle,
+.dark-mode #reply-content,
+.dark-mode #thread-summary-section,
+.dark-mode #user-preferences-status {
+  background: rgba(45, 45, 45, 0.95) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-mode #custom-prompt-input {
+  background: rgba(61, 61, 61, 0.95) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-mode h2, .dark-mode h3, .dark-mode h4, .dark-mode h5,
+.dark-mode p, .dark-mode span, .dark-mode div {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode #preferences-subtitle {
+  color: var(--text-secondary) !important;
+}
+  /* Dark scrollbar styles */
+.dark-mode ::-webkit-scrollbar {
+  width: 8px;
+  background: #2d2d2d;
+}
+
+.dark-mode ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: #4d4d4d;
+  border-radius: 4px;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #5d5d5d;
+}
+
+.dark-mode ::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}
+  .dark-mode .settings-panel-header {
+  background: rgba(45, 45, 45, 0.95) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.dark-mode #settings-panel h3 {
+  color: var(--text-primary) !important;
+}
       </style>
     `;
     
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);
     
-    const settingsToggleBtn = document.getElementById("settings-toggle-btn");
-    const settingsPanel = document.getElementById("settings-panel");
-    let settingsOpen = false;
-  
-    if (settingsToggleBtn) {
-      settingsToggleBtn.addEventListener("click", () => {
-        settingsOpen = !settingsOpen;
-        const badge = settingsToggleBtn.querySelector(".exclamation-badge");
-        if (settingsOpen) {
-          settingsPanel.style.display = "block";
-          settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.4)";
-          settingsToggleBtn.style.transform = "rotate(45deg)";
-          if (badge) badge.style.transform = "rotate(-45deg)";
-        } else {
-          settingsPanel.style.display = "none";
-          settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.2)";
-          settingsToggleBtn.style.transform = "rotate(0deg)";
-          if (badge) badge.style.transform = "rotate(0deg)";
-        }
-      });
+const settingsToggleBtn = document.getElementById("settings-toggle-btn");
+const settingsPanel = document.getElementById("settings-panel");
+let settingsOpen = false;
+
+if (settingsToggleBtn) {
+  settingsToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // Prevent event bubbling
+    settingsOpen = !settingsOpen;
+    const badge = settingsToggleBtn.querySelector(".exclamation-badge");
+    if (settingsOpen) {
+      settingsPanel.style.display = "block";
+      settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.4)";
+      settingsToggleBtn.style.transform = "rotate(45deg)";
+      if (badge) badge.style.transform = "rotate(-45deg)";
+    } else {
+      settingsPanel.style.display = "none";
+      settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.2)";
+      settingsToggleBtn.style.transform = "rotate(0deg)";
+      if (badge) badge.style.transform = "rotate(0deg)";
     }
-    
-    document.addEventListener("click", (e) => {
-      if (!settingsPanel.contains(e.target) && !settingsToggleBtn.contains(e.target)) {
-        settingsOpen = false;
-        settingsPanel.style.display = "none";
-        settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.2)";
-        settingsToggleBtn.style.transform = "rotate(0deg)";
-      }
-    });
-    
+  });
+}
+
+document.addEventListener("click", (e) => {
+  if (!settingsPanel.contains(e.target) && 
+      !settingsToggleBtn.contains(e.target) && 
+      !darkModeToggle.contains(e.target)) {
+    settingsOpen = false;
+    settingsPanel.style.display = "none";
+    settingsToggleBtn.style.background = "rgba(255, 255, 255, 0.2)";
+    settingsToggleBtn.style.transform = "rotate(0deg)";
+  }
+});    
     const toggleSwitch = document.getElementById("custom-mode-switch");
     const customPromptSection = document.getElementById("custom-prompt-section");
     const customPromptInput = document.getElementById("custom-prompt-input");
@@ -1310,6 +1420,41 @@ customPromptInput.addEventListener("input", (e) => {
         alert("Please click the extension icon in your browser to setup your preferences.");
       }
     });
+    // Dark mode toggle functionality
+// Dark mode toggle functionality
+const darkModeToggle = document.getElementById("dark-mode-toggle");
+const themeIcon = document.getElementById("theme-icon");
+let isDarkMode = localStorage.getItem('darkMode') === 'true';
+
+// Apply saved theme
+if (isDarkMode) {
+  document.body.classList.add('dark-mode');
+  modal.classList.add('dark-mode');
+  modal.querySelector('div').classList.add('modal-header');
+  // Simple moon icon for dark mode
+  themeIcon.innerHTML = '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-5.52-4.48-10-9-10z"/>';
+}
+
+darkModeToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  isDarkMode = !isDarkMode;
+  
+  if (isDarkMode) {
+    document.body.classList.add('dark-mode');
+    modal.classList.add('dark-mode');
+    modal.querySelector('div').classList.add('modal-header');
+    // Simple moon icon for dark mode
+    themeIcon.innerHTML = '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-5.52-4.48-10-9-10z"/>';
+    localStorage.setItem('darkMode', 'true');
+  } else {
+    document.body.classList.remove('dark-mode');
+    modal.classList.remove('dark-mode');
+    modal.querySelector('div').classList.remove('modal-header');
+    // Simple sun icon for light mode
+    themeIcon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>';
+    localStorage.setItem('darkMode', 'false');
+  }
+});
     
     updateUserPreferencesStatus();
     
@@ -1881,27 +2026,29 @@ function showSuccessNotification(message) {
 }
 
 // Enhanced generateReply function with caching
+// Enhanced generateReply function with caching - INSTANT MODAL
 async function generateReplyWithCache(emailContent, receiverEmail) {
   const cacheKey = `autoreply_${generateCacheKey()}`;
+  
+  // ALWAYS show modal first - instantly
+  const modalElements = createModal();
+  const modal = modalElements.modal;
+  const backdrop = modalElements.backdrop;
+  
+  // Show modal immediately
+  backdrop.style.display = "block";
+  modal.style.display = "block";
+  backdrop.style.animation = "fadeIn 0.3s ease-out";
+  modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
+  
+  const replyContent = document.getElementById("reply-content");
   
   // Check if we already have a cached response
   if (responseCache.has(cacheKey)) {
     console.log("📄 Using cached auto-reply response");
     const cachedResponse = responseCache.get(cacheKey);
     
-    // Show modal and display cached response
-    const modalElements = createModal();
-    const modal = modalElements.modal;
-    const backdrop = modalElements.backdrop;
-    
-    // Show modal with animation
-    backdrop.style.display = "block";
-    modal.style.display = "block";
-    backdrop.style.animation = "fadeIn 0.3s ease-out";
-    modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
-    
-    // Display the cached response
-    const replyContent = document.getElementById("reply-content");
+    // Display the cached response immediately
     replyContent.innerHTML = `
       <div style="
         position: relative;
@@ -1949,34 +2096,6 @@ async function generateReplyWithCache(emailContent, receiverEmail) {
           font-family: Arial, sans-serif;
           font-size: 14px;
         ">${cachedResponse}</div>
-        
-        <div style="
-          margin-top: 12px;
-          display: flex;
-          gap: 8px;
-        ">
-          <button id="copy-reply-cached" style="
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-          ">Copy Reply</button>
-          
-          <button id="regenerate-reply-cached" style="
-            background-color: #f8f9fa;
-            color: #3c4043;
-            border: 1px solid #dadce0;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-          ">Regenerate</button>
-        </div>
       </div>
     `;
     
@@ -1985,11 +2104,18 @@ async function generateReplyWithCache(emailContent, receiverEmail) {
     return;
   }
 
-  // If not cached, proceed with normal generation
+  // If not cached, show loading and generate in background
   console.log("🔄 Generating new auto-reply response");
-  await generateReply(emailContent, receiverEmail);
+  replyContent.classList.add("loading");
+  
+  // Start API call in background - don't await here
+  generateReplyContent(emailContent, false, null, receiverEmail).then(() => {
+    replyContent.classList.remove("loading");
+  }).catch(error => {
+    console.error("Error generating reply:", error);
+    replyContent.classList.remove("loading");
+  });
 }
-
 // Helper function to setup button event listeners for cached replies
 function setupCachedReplyButtons(replyText, cacheKey, emailContent, receiverEmail) {
   // Copy button
@@ -2022,20 +2148,22 @@ function setupCachedReplyButtons(replyText, cacheKey, emailContent, receiverEmai
 }
 
 // Update generateReply to accept receiver email
+// Update generateReply to accept receiver email - INSTANT MODAL
 async function generateReply(emailContent, receiverEmail) {
+  // ALWAYS show modal first
   const modalElements = createModal();
   const modal = modalElements.modal;
   const backdrop = modalElements.backdrop;
   
-  // Get the custom mode settings
-  const customModeSwitch = document.getElementById("custom-mode-switch");
-  const replyContent = document.getElementById("reply-content");
-  
-  // Show modal with animation
+  // Show modal immediately
   backdrop.style.display = "block";
   modal.style.display = "block";
   backdrop.style.animation = "fadeIn 0.3s ease-out";
   modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
+  
+  // Get the custom mode settings
+  const customModeSwitch = document.getElementById("custom-mode-switch");
+  const replyContent = document.getElementById("reply-content");
   
   // If custom mode is enabled, just show the UI and wait for user input
   if (customModeSwitch && customModeSwitch.checked) {
@@ -2043,9 +2171,17 @@ async function generateReply(emailContent, receiverEmail) {
     return;
   }
   
-  // Otherwise, generate reply automatically
+  // Otherwise, generate reply automatically in background
   replyContent.style.display = "block";
-  generateReplyContent(emailContent, false, null, receiverEmail);
+  replyContent.classList.add("loading");
+  
+  // Start generation in background
+  generateReplyContent(emailContent, false, null, receiverEmail).then(() => {
+    replyContent.classList.remove("loading");
+  }).catch(error => {
+    console.error("Error generating reply:", error);
+    replyContent.classList.remove("loading");
+  });
 }
 
 // Main function to generate reply content
@@ -2183,9 +2319,14 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
 }
 
 // Helper function to show cached reply content
-// Helper function to show cached reply content
+// Find the showCachedReply function and replace it with this updated version:
+
 function showCachedReply(replyText) {
   const replyContent = document.getElementById("reply-content");
+  
+  // Check if dark mode is active - IMPORTANT: Check modal's dark mode class
+  const modal = document.getElementById(MODAL_ID);
+  const isDarkMode = modal ? modal.classList.contains('dark-mode') : document.body.classList.contains('dark-mode');
   
   // Get current cache key for regeneration
   const toggleSwitch = document.getElementById("custom-mode-switch");
@@ -2196,12 +2337,20 @@ function showCachedReply(replyText) {
     ? `customreply_${generateCacheKey()}_${customPrompt}`
     : `autoreply_${generateCacheKey()}`;
   
+  // Dynamic colors based on theme
+  const bgColor = isDarkMode ? '#2d2d2d' : '#f8f9fa';
+  const borderColor = isDarkMode ? '#4d4d4d' : '#e8eaed';
+  const textColor = isDarkMode ? '#ffffff' : '#1f2937';
+  const cardBg = isDarkMode ? '#3d3d3d' : 'white';
+  const badgeBg = isDarkMode ? '#22c55e' : '#34a853';
+  const statusColor = isDarkMode ? '#16a34a' : '#137333';
+  
   // Use the same structure as cached replies to ensure clean text extraction
   replyContent.innerHTML = `
     <div style="
       position: relative;
-      background-color: #f8f9fa;
-      border: 1px solid #e8eaed;
+      background-color: ${bgColor};
+      border: 1px solid ${borderColor};
       border-radius: 8px;
       padding: 16px;
       margin: 12px 0;
@@ -2211,7 +2360,7 @@ function showCachedReply(replyText) {
         position: absolute;
         top: 8px;
         right: 12px;
-        background: #34a853;
+        background: ${badgeBg};
         color: white;
         padding: 2px 8px;
         border-radius: 12px;
@@ -2224,25 +2373,26 @@ function showCachedReply(replyText) {
         align-items: center;
         margin-bottom: 12px;
       ">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#34a853" style="margin-right: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="${badgeBg}" style="margin-right: 8px;">
           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
         </svg>
         <span style="
-          color: #137333;
+          color: ${statusColor};
           font-weight: 500;
           font-size: 14px;
         ">Reply Ready (Cached)</span>
       </div>
       
       <div id="cached-reply-text" style="
-        background-color: white;
+        background-color: ${cardBg};
         border-radius: 6px;
         padding: 16px;
-        border: 1px solid #e8eaed;
+        border: 1px solid ${borderColor};
         white-space: pre-wrap;
         line-height: 1.5;
         font-family: Arial, sans-serif;
         font-size: 14px;
+        color: ${textColor};
       ">${replyText}</div>
       
       <div style="
@@ -2263,9 +2413,9 @@ function showCachedReply(replyText) {
         ">Copy Reply</button>
         
         <button id="regenerate-reply-cached" style="
-          background-color: #f8f9fa;
-          color: #3c4043;
-          border: 1px solid #dadce0;
+          background-color: ${isDarkMode ? '#3d3d3d' : '#f8f9fa'};
+          color: ${isDarkMode ? '#ffffff' : '#3c4043'};
+          border: 1px solid ${borderColor};
           padding: 8px 16px;
           border-radius: 4px;
           cursor: pointer;
@@ -2321,6 +2471,58 @@ function showCachedReply(replyText) {
       }
     });
   }
+}
+
+// Also update the generateReplyWithCache function to apply dark mode when showing cached content:
+
+async function generateReplyWithCache(emailContent, receiverEmail) {
+  const cacheKey = `autoreply_${generateCacheKey()}`;
+  
+  // ALWAYS show modal first - instantly
+  const modalElements = createModal();
+  const modal = modalElements.modal;
+  const backdrop = modalElements.backdrop;
+  
+  // Show modal immediately
+  backdrop.style.display = "block";
+  modal.style.display = "block";
+  backdrop.style.animation = "fadeIn 0.3s ease-out";
+  modal.style.animation = "modalSlideIn 0.4s ease-out forwards";
+  
+  // IMPORTANT: Apply dark mode to modal immediately if needed
+  const isDarkMode = localStorage.getItem('darkMode') === 'true';
+  if (isDarkMode) {
+    document.body.classList.add('dark-mode');
+    modal.classList.add('dark-mode');
+    modal.querySelector('div').classList.add('modal-header');
+  }
+  
+  const replyContent = document.getElementById("reply-content");
+  
+  // Check if we already have a cached response
+  if (responseCache.has(cacheKey)) {
+    console.log("📄 Using cached auto-reply response");
+    const cachedResponse = responseCache.get(cacheKey);
+    
+    // Display the cached response with proper dark mode styling
+    showCachedReply(cachedResponse);
+    
+    // Add event listeners for cached response buttons
+    setupCachedReplyButtons(cachedResponse, cacheKey, emailContent, receiverEmail);
+    return;
+  }
+
+  // If not cached, show loading and generate in background
+  console.log("🔄 Generating new auto-reply response");
+  replyContent.classList.add("loading");
+  
+  // Start API call in background - don't await here
+  generateReplyContent(emailContent, false, null, receiverEmail).then(() => {
+    replyContent.classList.remove("loading");
+  }).catch(error => {
+    console.error("Error generating reply:", error);
+    replyContent.classList.remove("loading");
+  });
 }
 
 // Function to analyze email thread
@@ -2760,62 +2962,41 @@ function injectButton() {
   }
   
   button.addEventListener("click", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
+  
+  // Load user preferences in background if needed
+  if (userPreferences === null) {
+    loadUserPreferences(); // Don't await - let it load in background
+  }
+  
+  const receiverEmail = extractReceiverEmail();
+  const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
+  
+  if (emailContent) {
+    const emailText = emailContent.innerText;
     
-    const receiverEmail = extractReceiverEmail();
-    if (userPreferences === null) {
-      await loadUserPreferences();
-    }
-    
-    const emailContent = document.querySelector('div[role="listitem"] div.a3s.aiL');
-    if (emailContent) {
-      const emailText = emailContent.innerText;
-      try {
-        const cacheKey = `summary_${generateCacheKey()}`;
-        if (!responseCache.has(cacheKey)) {
-          const threadData = await extractEmailThread();
-          analyzeEmailThread(threadData).then(result => {
-            if (result && result.analysis) {
-              responseCache.set(cacheKey, result.analysis);
-            }
-          }).catch(error => {
-            console.error("Background thread analysis failed:", error);
-          });
+    // Start background thread analysis without waiting
+    const cacheKey = `summary_${generateCacheKey()}`;
+    if (!responseCache.has(cacheKey)) {
+      extractEmailThread().then(threadData => {
+        return analyzeEmailThread(threadData);
+      }).then(result => {
+        if (result && result.analysis) {
+          responseCache.set(cacheKey, result.analysis);
         }
-        await generateReplyWithCache(emailText, receiverEmail);
-      } catch (error) {
-        console.error("Error extracting thread:", error);
-        const replyContent = document.getElementById("reply-content");
-        replyContent.innerHTML = `
-          <div style="
-            text-align: center;
-            padding: 48px 0;
-            color: #ef4444;
-          ">
-            <p style="margin: 0; font-size: 14px;">
-              Error loading email content. Please try again.
-            </p>
-          </div>
-        `;
-        replyContent.classList.remove("loading");
-      }
-    } else {
-      const replyContent = document.getElementById("reply-content");
-      replyContent.innerHTML = `
-        <div style="
-          text-align: center;
-          padding: 48px 0;
-          color: #ef4444;
-        ">
-          <p style="margin: 0; font-size: 14px;">
-            Could not find email content. Please ensure you're viewing an email.
-          </p>
-        </div>
-      `;
-      replyContent.classList.remove("loading");
+      }).catch(error => {
+        console.error("Background thread analysis failed:", error);
+      });
     }
-  }, true);
+    
+    // IMMEDIATELY show modal and start reply generation
+    generateReplyWithCache(emailText, receiverEmail);
+    
+  } else {
+    alert("Could not find email content. Please ensure you're viewing an email.");
+  }
+}, true);
 
   button.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {

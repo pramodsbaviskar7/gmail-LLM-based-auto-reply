@@ -8,6 +8,12 @@ class GmailComposeFeature {
         this.initialized = false;
         this.darkMode = false;
         this.API_URL = 'https://gmail-llm-based-auto-reply.vercel.app';
+        // ADD THESE NEW LINES:
+        this.recognition = null;
+        this.isListening = false;
+        this.voiceButton = null;
+        this.formStateId = Date.now();
+
     }
 
     init() {
@@ -293,29 +299,34 @@ class GmailComposeFeature {
             }
 
             .rx-textarea {
-                width: 100%;
-                min-height: 120px;
-                padding: 12px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-                resize: vertical;
-                transition: border-color 0.2s;
-                font-family: inherit;
-                background: white;
-                color: #1f2937;
-            }
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color 0.2s;
+    font-family: inherit;
+    background: white;
+    color: #1f2937;
+    box-sizing: border-box; /* This is crucial - includes padding and border in width */
+    max-width: 100%; /* Prevents expanding beyond container */
+    overflow-wrap: break-word; /* Breaks long words if needed */
+    word-wrap: break-word; /* Fallback for older browsers */
+}
 
-            .rx-modal.dark .rx-textarea {
-                background: #374151;
-                border-color: #4b5563;
-                color: #f3f4f6;
-            }
+.rx-modal.dark .rx-textarea {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
 
-            .rx-textarea:focus {
-                outline: none;
-                border-color: #667eea;
-            }
+.rx-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
 
             .rx-char-count {
                 text-align: right;
@@ -546,8 +557,648 @@ class GmailComposeFeature {
             .rx-modal.dark .rx-email-body {
                 color: #e5e7eb;
             }
-        `;
-        document.head.appendChild(style);
+                /* Add these scrollbar styles to your existing CSS in the injectStyles() method */
+
+/* Light mode scrollbars (default) */
+.rx-modal ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.rx-modal ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.rx-modal ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    border: 1px solid #f1f5f9;
+}
+
+.rx-modal ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.rx-modal ::-webkit-scrollbar-corner {
+    background: #f1f5f9;
+}
+
+/* Dark mode scrollbars */
+.rx-modal.dark ::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.rx-modal.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border: 1px solid #1f2937;
+}
+
+.rx-modal.dark ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+.rx-modal.dark ::-webkit-scrollbar-corner {
+    background: #1f2937;
+}
+
+/* Firefox scrollbar support */
+.rx-modal {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.rx-modal.dark {
+    scrollbar-color: #4b5563 #1f2937;
+}
+
+/* Also style scrollbars for specific scrollable elements */
+.rx-body ::-webkit-scrollbar {
+    width: 8px;
+}
+
+.rx-body ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.rx-body ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.rx-body ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.rx-modal.dark .rx-body ::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.rx-modal.dark .rx-body ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.rx-modal.dark .rx-body ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* For textareas specifically */
+.rx-textarea::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rx-textarea::-webkit-scrollbar-track {
+    background: #f9fafb;
+    border-radius: 3px;
+}
+
+.rx-textarea::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.rx-textarea::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+.rx-modal.dark .rx-textarea::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+.rx-modal.dark .rx-textarea::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.rx-modal.dark .rx-textarea::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Specific fixes for the optional input fields */
+#recipientContext,
+#subjectLine,
+#openingSentence,
+#closingLine {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    color: #1f2937;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+    max-width: 100%;
+    font-family: inherit;
+}
+
+.rx-modal.dark #recipientContext,
+.rx-modal.dark #subjectLine,
+.rx-modal.dark #openingSentence,
+.rx-modal.dark #closingLine {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+#recipientContext:focus,
+#subjectLine:focus,
+#openingSentence:focus,
+#closingLine:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Additional container fixes */
+.rx-body {
+    padding: 24px;
+    overflow-y: auto;
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    flex: 1;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Ensure the modal container doesn't overflow */
+.rx-modal {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+    box-sizing: border-box;
+}
+
+/* Fix for tab content containers */
+.rx-tab-content {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.rx-tab-content.active {
+    display: block;
+    width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .rx-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .rx-body {
+        padding: 16px;
+    }
+    
+    .rx-modal {
+        width: 95%;
+        margin: 10px;
+    }
+        
+}
+        /* Updated Voice Input Button - Icon Only */
+.voice-input-container {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.voice-input-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.voice-input-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: 50%;
+}
+
+.voice-input-btn:hover::before {
+    opacity: 1;
+}
+
+.voice-input-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+}
+
+.voice-input-btn.listening {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    animation: pulse-recording 1.5s ease-in-out infinite;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.voice-input-btn.listening::before {
+    background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.2) 100%);
+    opacity: 1;
+}
+
+.voice-input-btn.listening:hover {
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes pulse-recording {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4), 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.6), 0 0 0 8px rgba(239, 68, 68, 0.1);
+    }
+}
+
+/* Dark mode adjustments for voice button */
+.rx-modal.dark .voice-input-btn {
+    background: linear-gradient(135deg, #818cf8 0%, #a855f7 100%);
+    box-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);
+}
+
+.rx-modal.dark .voice-input-btn:hover {
+    box-shadow: 0 4px 16px rgba(129, 140, 248, 0.4);
+}
+
+.rx-modal.dark .voice-input-btn.listening {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    box-shadow: 0 2px 8px rgba(248, 113, 113, 0.4);
+}
+
+
+/* Updated tooltip styles to match theme */
+.voice-tooltip {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.voice-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1f2937;
+}
+
+.voice-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-4px);
+}
+
+.rx-modal.dark .voice-tooltip {
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    color: #1f2937;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.rx-modal.dark .voice-tooltip::after {
+    border-top-color: #f3f4f6;
+}
+
+/* Enhanced modal opening tooltip */
+.modal-voice-hint {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10001;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-voice-hint.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.modal-voice-hint .hint-icon {
+    font-size: 18px;
+    animation: bounce-hint 2s ease-in-out infinite;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+@keyframes bounce-hint {
+    0%, 100% { 
+        transform: translateY(0) scale(1);
+    }
+    50% { 
+        transform: translateY(-4px) scale(1.1);
+    }
+}
+
+.rx-modal.dark .modal-voice-hint {
+    background: linear-gradient(135deg, #818cf8 0%, #a855f7 100%);
+    box-shadow: 0 8px 32px rgba(129, 140, 248, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Voice activity indicator improvements */
+.voice-indicator {
+    display: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-top: 12px;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rx-modal.dark .voice-indicator {
+    background: linear-gradient(135deg, #818cf8 0%, #a855f7 100%);
+    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
+}
+
+.voice-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.voice-animation {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.voice-wave {
+    width: 3px;
+    height: 16px;
+    background: white;
+    border-radius: 2px;
+    animation: voice-wave 1.2s ease-in-out infinite;
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.voice-wave:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.voice-wave:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes voice-wave {
+    0%, 100% { 
+        height: 4px; 
+        opacity: 0.6;
+        transform: scaleY(1);
+    }
+    50% { 
+        height: 16px; 
+        opacity: 1;
+        transform: scaleY(1.2);
+    }
+}
+
+.interim-text {
+    font-style: italic;
+    opacity: 0.9;
+    margin-top: 4px;
+    font-size: 13px;
+    min-height: 18px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+}
+
+/* Enhanced button icons - using better symbols */
+.voice-input-btn .voice-icon {
+    font-size: 16px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .voice-input-container {
+        flex-direction: row;
+        justify-content: flex-start;
+    }
+    
+    .voice-input-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+    
+    .modal-voice-hint {
+        padding: 12px 18px;
+        font-size: 13px;
+        max-width: 280px;
+        text-align: center;
+    }
+}
+
+.clear-input-btn {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
+    position: relative;
+}
+
+.clear-input-btn:hover {
+    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+}
+
+.clear-input-btn.clearing {
+    animation: clear-spin 0.6s ease-in-out;
+}
+
+@keyframes clear-spin {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(0.9); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.rx-modal.dark .clear-input-btn {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+}
+
+.rx-modal.dark .clear-input-btn:hover {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+    /* FIX: Dark mode for Templates tab */
+
+/* Template Preview Area - Dark Mode Support */
+.template-preview {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Template Preview Content */
+.template-preview-content {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 200px;
+}
+
+/* Template Subject Line */
+.template-subject {
+    color: var(--accent-color);
+    font-weight: 600;
+    margin-bottom: 12px;
+    background: transparent;
+}
+
+/* Template Body Text */
+.template-body {
+    color: var(--text-primary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    background: transparent;
+}
+
+/* Quick Templates Dropdown - Dark Mode */
+.template-dropdown {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.template-dropdown option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Template Container */
+.templates-container {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Ensure all text in templates section follows dark mode */
+.templates-tab .form-group label,
+.templates-tab .form-control,
+.templates-tab .template-preview *,
+.templates-tab h3,
+.templates-tab h4 {
+    color: var(--text-primary) !important;
+    background: var(--bg-primary);
+}
+
+/* Fix any input fields in templates */
+.templates-tab input,
+.templates-tab select,
+.templates-tab textarea {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+/* Dark mode specific overrides */
+[data-theme="dark"] .template-preview {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #404040;
+}
+
+[data-theme="dark"] .template-preview-content {
+    background: #1e1e1e;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .template-subject {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .template-body {
+    color: #e0e0e0;
+}
+
+/* If you're using specific class names, add them here */
+.dark-mode .template-preview,
+.dark .template-preview {
+    background: #2a2a2a !important;
+    color: #e0e0e0 !important;
+}
+
+.dark-mode .template-preview-content,
+.dark .template-preview-content {
+    background: #1e1e1e !important;
+    color: #e0e0e0 !important;
+}
+
+    `;
+    document.head.appendChild(style);
     }
 
     injectComposeButton() {
@@ -610,7 +1261,437 @@ class GmailComposeFeature {
             }
         }, 500);
     }
+    initVoiceRecognition() {
+    // Check for speech recognition support
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.error('Speech recognition not supported');
+        return false;
+    }
 
+    try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.recognition = new SpeechRecognition();
+        
+        // Configuration
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.maxAlternatives = 1;
+        
+        // Get language from dropdown
+        const languageSelect = this.modal.querySelector('#languageSelect');
+        const selectedLang = languageSelect ? languageSelect.value : 'english';
+        
+        const langMap = {
+            'english': 'en-US',
+            'spanish': 'es-ES',
+            'french': 'fr-FR',
+            'german': 'de-DE',
+            'italian': 'it-IT',
+            'portuguese': 'pt-BR',
+            'chinese': 'zh-CN',
+            'japanese': 'ja-JP',
+            'hindi': 'hi-IN'
+        };
+        
+        this.recognition.lang = langMap[selectedLang] || 'en-US';
+        console.log('Voice recognition language set to:', this.recognition.lang);
+        
+        // Event handlers - NO NOTIFICATION IN ONSTART
+        this.recognition.onstart = () => {
+            console.log('Speech recognition started');
+            // No notification here to prevent duplicates
+        };
+        
+        this.recognition.onresult = (event) => {
+            console.log('Speech recognition result received:', event);
+            this.handleVoiceResult(event);
+        };
+        
+        this.recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event);
+            this.handleVoiceError(event);
+        };
+        
+        this.recognition.onend = () => {
+            console.log('Speech recognition ended');
+            this.stopVoiceInput();
+        };
+        
+        this.recognition.onnomatch = () => {
+            console.log('No speech match found');
+            this.showNotification('No speech recognized. Please try again.', 'error');
+        };
+        
+        this.recognition.onspeechstart = () => {
+            console.log('Speech detected');
+        };
+        
+        this.recognition.onspeechend = () => {
+            console.log('Speech ended');
+        };
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Error initializing speech recognition:', error);
+        return false;
+    }
+}
+
+h// REPLACE your existing handleVoiceResult method with this fixed version:
+
+handleVoiceResult(event) {
+    const promptInput = this.modal.querySelector('#promptInput');
+    const charCount = this.modal.querySelector('#charCount');
+    
+    if (!event.results || event.results.length === 0) {
+        console.log('No speech results received');
+        return;
+    }
+    
+    let finalTranscript = '';
+    let interimTranscript = '';
+
+    // Process all results from the current event
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        
+        // Check if result exists and has transcript
+        if (result && result[0] && result[0].transcript) {
+            const transcript = result[0].transcript;
+            
+            if (result.isFinal) {
+                finalTranscript += transcript;
+                console.log('Final transcript:', transcript);
+            } else {
+                interimTranscript += transcript;
+                console.log('Interim transcript:', transcript);
+            }
+        }
+    }
+
+    // Only update the textarea with final results
+    if (finalTranscript.trim()) {
+        // Get current cursor position
+        const cursorPos = promptInput.selectionStart;
+        const currentText = promptInput.value;
+        
+        // Insert the new text at cursor position
+        const beforeCursor = currentText.substring(0, cursorPos);
+        const afterCursor = currentText.substring(cursorPos);
+        const newText = beforeCursor + finalTranscript + ' ' + afterCursor;
+        
+        promptInput.value = newText;
+        charCount.textContent = newText.length;
+        
+        // Set cursor after the inserted text
+        const newCursorPos = cursorPos + finalTranscript.length + 1;
+        promptInput.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // Trigger input event for any other listeners
+        promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    
+    // Update the interim display
+    this.updateVoiceIndicator(interimTranscript);
+}
+
+// ALSO UPDATE your initVoiceRecognition method with better error handling:
+
+initVoiceRecognition() {
+    // Check for speech recognition support
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.error('Speech recognition not supported');
+        return false;
+    }
+
+    try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.recognition = new SpeechRecognition();
+        
+        // Configuration
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.maxAlternatives = 1;
+        
+        // Get language from dropdown
+        const languageSelect = this.modal.querySelector('#languageSelect');
+        const selectedLang = languageSelect ? languageSelect.value : 'english';
+        
+        const langMap = {
+            'english': 'en-US',
+            'spanish': 'es-ES',
+            'french': 'fr-FR',
+            'german': 'de-DE',
+            'italian': 'it-IT',
+            'portuguese': 'pt-BR',
+            'chinese': 'zh-CN',
+            'japanese': 'ja-JP',
+            'hindi': 'hi-IN'
+        };
+        
+        this.recognition.lang = langMap[selectedLang] || 'en-US';
+        console.log('Voice recognition language set to:', this.recognition.lang);
+        
+        // Event handlers
+        this.recognition.onstart = () => {
+            console.log('Speech recognition started');
+            this.showNotification('🎤 Listening... Speak clearly!', 'success');
+        };
+        
+        this.recognition.onresult = (event) => {
+            console.log('Speech recognition result received:', event);
+            this.handleVoiceResult(event);
+        };
+        
+        this.recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event);
+            this.handleVoiceError(event);
+        };
+        
+        this.recognition.onend = () => {
+            console.log('Speech recognition ended');
+            this.stopVoiceInput();
+        };
+        
+        this.recognition.onnomatch = () => {
+            console.log('No speech match found');
+            this.showNotification('No speech recognized. Please try again.', 'error');
+        };
+        
+        this.recognition.onspeechstart = () => {
+            console.log('Speech detected');
+        };
+        
+        this.recognition.onspeechend = () => {
+            console.log('Speech ended');
+        };
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Error initializing speech recognition:', error);
+        return false;
+    }
+}
+
+// ALSO UPDATE your startVoiceInput method:
+
+startVoiceInput() {
+    if (!this.recognition) {
+        if (!this.initVoiceRecognition()) {
+            this.showNotification('Speech recognition not supported in this browser', 'error');
+            return;
+        }
+    }
+
+    // Stop any existing recognition
+    if (this.isListening) {
+        this.recognition.stop();
+        return;
+    }
+
+    try {
+        // Update language before starting
+        const languageSelect = this.modal.querySelector('#languageSelect');
+        const selectedLang = languageSelect ? languageSelect.value : 'english';
+        
+        const langMap = {
+            'english': 'en-US',
+            'spanish': 'es-ES',
+            'french': 'fr-FR',
+            'german': 'de-DE',
+            'italian': 'it-IT',
+            'portuguese': 'pt-BR',
+            'chinese': 'zh-CN',
+            'japanese': 'ja-JP',
+            'hindi': 'hi-IN'
+        };
+        
+        this.recognition.lang = langMap[selectedLang] || 'en-US';
+        
+        // Clear any previous state
+        this.isListening = true;
+        this.updateVoiceButton();
+        this.showVoiceIndicator();
+        
+        // Start recognition
+        this.recognition.start();
+        
+    } catch (error) {
+        console.error('Error starting voice recognition:', error);
+        this.showNotification('Could not start voice input: ' + error.message, 'error');
+        this.stopVoiceInput();
+    }
+}
+
+// DEBUGGING: Add this method to help troubleshoot
+
+debugVoiceRecognition() {
+    console.log('=== Voice Recognition Debug Info ===');
+    console.log('Browser:', navigator.userAgent);
+    console.log('Speech Recognition available:', 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+    console.log('Current language:', this.recognition ? this.recognition.lang : 'Not initialized');
+    console.log('Is listening:', this.isListening);
+    console.log('Recognition object:', this.recognition);
+}
+
+handleVoiceError(event) {
+    console.error('Speech recognition error:', event.error);
+    this.showNotification('Voice input error: ' + event.error, 'error');
+    this.stopVoiceInput();
+}
+
+startVoiceInput() {
+    if (!this.recognition) {
+        if (!this.initVoiceRecognition()) {
+            this.showNotification('Speech recognition not supported', 'error');
+            return;
+        }
+    }
+
+    try {
+        this.recognition.start();
+        this.isListening = true;
+        this.updateVoiceButton();
+        this.showVoiceIndicator();
+        this.showNotification('🎤 Listening... Speak now!', 'success');
+    } catch (error) {
+        this.showNotification('Could not start voice input', 'error');
+    }
+}
+
+stopVoiceInput() {
+    if (this.recognition && this.isListening) {
+        this.recognition.stop();
+    }
+    
+    this.isListening = false;
+    this.updateVoiceButton();
+    this.hideVoiceIndicator();
+}
+
+toggleVoiceInput() {
+    if (this.isListening) {
+        this.stopVoiceInput();
+    } else {
+        this.startVoiceInput();
+    }
+}
+
+updateVoiceButton() {
+    if (!this.voiceButton) return;
+    
+    const tooltip = this.modal.querySelector('#voiceTooltip');
+    
+    if (this.isListening) {
+        this.voiceButton.classList.add('listening');
+        this.voiceButton.innerHTML = '⏹️';
+        this.voiceButton.title = 'Click to stop recording';
+        if (tooltip) {
+            tooltip.textContent = 'Click to stop';
+            tooltip.classList.remove('show'); // Hide tooltip while recording
+        }
+    } else {
+        this.voiceButton.classList.remove('listening');
+        this.voiceButton.innerHTML = '🎤';
+        this.voiceButton.title = 'Click to start voice input';
+        if (tooltip) {
+            tooltip.textContent = 'Click to speak';
+        }
+    }
+}
+
+showVoiceIndicator() {
+    let indicator = this.modal.querySelector('#voiceIndicator');
+    if (indicator) {
+        indicator.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="voice-animation">
+                    <div class="voice-wave"></div>
+                    <div class="voice-wave"></div>
+                    <div class="voice-wave"></div>
+                </div>
+                <span>Listening...</span>
+                <div class="interim-text" id="interimText"></div>
+            </div>
+        `;
+        indicator.style.display = 'block';
+    }
+}
+
+hideVoiceIndicator() {
+    const indicator = this.modal.querySelector('#voiceIndicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+updateVoiceIndicator(interimText) {
+    const interimElement = this.modal.querySelector('#interimText');
+    if (interimElement && interimText) {
+        interimElement.textContent = `"${interimText}"`;
+    }
+}
+async loadUserSignaturePreferences() {
+    return new Promise((resolve) => {
+        // Check if Chrome extension APIs are available
+        if (typeof chrome === 'undefined' || !chrome.storage) {
+            console.warn('Chrome storage not available for signature preferences');
+            resolve(null);
+            return;
+        }
+        
+        const storage = chrome.storage.sync || chrome.storage.local;
+        
+        storage.get(['userEmail', 'userInfo'], function(result) {
+            if (chrome.runtime.lastError) {
+                console.error('Error loading signature preferences:', chrome.runtime.lastError);
+                resolve(null);
+                return;
+            }
+            
+            console.log('📝 Loaded signature preferences:', result);
+            
+            // Construct signature preferences object (same format as auto-reply)
+            if (result.userInfo || result.userEmail) {
+                const preferences = {
+                    hasPreferences: true,
+                    email: result.userInfo?.email || result.userEmail || null,
+                    full_name: result.userInfo?.full_name || null,
+                    linkedin: result.userInfo?.linkedin || null,
+                    mobile: result.userInfo?.mobile || null
+                };
+                
+                console.log('✅ Signature preferences loaded for compose:', preferences);
+                resolve(preferences);
+            } else {
+                console.log('ℹ️ No signature preferences found');
+                resolve(null);
+            }
+        });
+    });
+}
+
+// 🔥 ADD THIS HELPER FUNCTION TOO
+updateSignatureStatus(hasPreferences) {
+    const signatureCheckbox = this.modal.querySelector('#includeSignature');
+    if (signatureCheckbox && hasPreferences) {
+        const label = signatureCheckbox.parentElement;
+        if (label) {
+            // Update the label to show signature is available
+            label.innerHTML = `
+                <input type="checkbox" id="includeSignature" checked>
+                <span style="color: #34a853; display: flex; align-items: center; gap: 4px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    Include signature (from saved preferences)
+                </span>
+            `;
+        }
+    }
+}
     createModal() {
         this.modal = document.createElement('div');
         this.modal.className = 'rx-modal-overlay';
@@ -649,20 +1730,32 @@ class GmailComposeFeature {
                         <!-- Basic Options Tab -->
                         <div class="rx-tab-content active" data-content="basic">
                             <div class="rx-form-group">
-                                <label class="rx-label">
-                                    What would you like to write about? <span style="color: #ef4444;">*</span>
-                                </label>
-                                <textarea 
-                                    class="rx-textarea" 
-                                    id="promptInput"
-                                    placeholder="E.g., Write an email to my team about the upcoming project deadline next Friday. Remind them about the key deliverables and ask for status updates."
-                                    maxlength="1000"
-                                    required
-                                ></textarea>
-                                <div class="rx-char-count">
-                                    <span id="charCount">0</span>/1000
-                                </div>
-                            </div>
+    <label class="rx-label">
+        What would you like to write about? <span style="color: #ef4444;">*</span>
+    </label>
+    <textarea 
+        class="rx-textarea" 
+        id="promptInput"
+        placeholder="E.g., Write an email to my team about the upcoming project deadline next Friday. Remind them about the key deliverables and ask for status updates."
+        maxlength="1000"
+        required
+    ></textarea>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+        <div class="voice-input-container">
+    <button type="button" class="voice-input-btn" id="voiceInputBtn" title="Click to start voice input">
+        🎤
+        <div class="voice-tooltip" id="voiceTooltip">Click to speak</div>
+    </button>
+    <button type="button" class="clear-input-btn" id="clearInputBtn" title="Clear text">
+        🗑️
+    </button>
+</div>
+        <div class="rx-char-count">
+            <span id="charCount">0</span>/1000
+        </div>
+    </div>
+    <div class="voice-indicator" id="voiceIndicator"></div>
+</div>
 
                             <div class="rx-grid">
                                 <div class="rx-form-group">
@@ -906,132 +1999,619 @@ class GmailComposeFeature {
 
         document.body.appendChild(this.modal);
         this.attachEventListeners();
+    
+    this.trackFormChanges();
+    
     }
 
-    attachEventListeners() {
-        // Close button
-        const closeBtn = this.modal.querySelector('.rx-close');
-        closeBtn.addEventListener('click', () => this.closeModal());
+attachEventListeners() {
+    // Close button
+    const closeBtn = this.modal.querySelector('.rx-close');
+    closeBtn.addEventListener('click', () => this.closeModal());
 
-        // Overlay click
-        this.modal.addEventListener('click', (e) => {
-            if (e.target === this.modal) {
-                this.closeModal();
-            }
-        });
+    // Overlay click
+    this.modal.addEventListener('click', (e) => {
+        if (e.target === this.modal) {
+            this.closeModal();
+        }
+    });
 
-        // Theme toggle
-        const themeToggle = this.modal.querySelector('#themeToggle');
-        themeToggle.addEventListener('click', () => {
-            this.darkMode = !this.darkMode;
-            const modal = this.modal.querySelector('.rx-modal');
-            modal.classList.toggle('dark', this.darkMode);
-            themeToggle.classList.toggle('active', this.darkMode);
-        });
+    // Theme toggle
+    const themeToggle = this.modal.querySelector('#themeToggle');
+    themeToggle.addEventListener('click', () => {
+        this.darkMode = !this.darkMode;
+        const modal = this.modal.querySelector('.rx-modal');
+        modal.classList.toggle('dark', this.darkMode);
+        themeToggle.classList.toggle('active', this.darkMode);
+    });
 
-        // Tab switching
-        const tabs = this.modal.querySelectorAll('.rx-tab');
-        const tabContents = this.modal.querySelectorAll('.rx-tab-content');
-        
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const targetTab = tab.dataset.tab;
-                
-                // Update active tab
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Update active content
-                tabContents.forEach(content => {
-                    content.classList.toggle('active', content.dataset.content === targetTab);
-                });
+    // Tab switching
+    const tabs = this.modal.querySelectorAll('.rx-tab');
+    const tabContents = this.modal.querySelectorAll('.rx-tab-content');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.dataset.tab;
+            
+            // Update active tab
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update active content
+            tabContents.forEach(content => {
+                content.classList.toggle('active', content.dataset.content === targetTab);
             });
         });
+    });
 
-        // Character counter
-        const promptInput = this.modal.querySelector('#promptInput');
-        const charCount = this.modal.querySelector('#charCount');
-        promptInput.addEventListener('input', () => {
-            charCount.textContent = promptInput.value.length;
-        });
+    // Character counter
+    const promptInput = this.modal.querySelector('#promptInput');
+    const charCount = this.modal.querySelector('#charCount');
+    promptInput.addEventListener('input', () => {
+        charCount.textContent = promptInput.value.length;
+    });
 
-        // Template selection
-        const templateSelect = this.modal.querySelector('#templateSelect');
-        const templatePreview = this.modal.querySelector('#templatePreview');
+    // Template selection
+    const templateSelect = this.modal.querySelector('#templateSelect');
+    const templatePreview = this.modal.querySelector('#templatePreview');
+    
+    templateSelect.addEventListener('change', () => {
+        const template = this.getTemplate(templateSelect.value);
+        if (template) {
+            // Show preview with better formatting
+            templatePreview.innerHTML = `
+                <div style="margin-bottom: 12px;">
+                    <strong style="color: #667eea;">Subject:</strong> 
+                    <span style="font-style: italic;">${template.subject}</span>
+                </div>
+                <div style="border-top: 1px solid #e5e7eb; padding-top: 12px; white-space: pre-line; line-height: 1.5;">
+                    ${template.body}
+                </div>
+            `;
+            
+            // Fill the prompt with template
+            promptInput.value = template.prompt;
+            charCount.textContent = template.prompt.length;
+            
+            // Add visual feedback
+            templatePreview.style.border = '2px solid #667eea';
+            templatePreview.style.backgroundColor = this.darkMode ? '#1f2937' : '#f8fafc';
+            
+            // Reset border after 2 seconds
+            setTimeout(() => {
+                templatePreview.style.border = '1px solid ' + (this.darkMode ? '#4b5563' : '#e5e7eb');
+            }, 2000);
+            
+        } else {
+            templatePreview.innerHTML = '<div style="color: #6b7280; font-style: italic;">Select a template to see a preview</div>';
+            templatePreview.style.border = '1px solid ' + (this.darkMode ? '#4b5563' : '#e5e7eb');
+            templatePreview.style.backgroundColor = this.darkMode ? '#374151' : '#f9fafb';
+        }
+    });
+
+    // Form submission
+    const form = this.modal.querySelector('#composeForm');
+    form.addEventListener('submit', (e) => this.handleGenerate(e));
+
+    // Copy button
+    const copyBtn = this.modal.querySelector('#copyButton');
+    copyBtn.addEventListener('click', () => this.copyToClipboard());
+
+    // Insert button
+    const insertBtn = this.modal.querySelector('#insertButton');
+    insertBtn.addEventListener('click', () => this.insertIntoGmail());
+
+    // Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.modal.classList.contains('active')) {
+            this.closeModal();
+        }
+    });
+
+    // ========== VOICE INPUT EVENT LISTENERS ==========
+    
+    // Voice input button
+    this.voiceButton = this.modal.querySelector('#voiceInputBtn');
+    const voiceTooltip = this.modal.querySelector('#voiceTooltip');
+
+    if (this.voiceButton) {
+        this.voiceButton.addEventListener('click', () => this.toggleVoiceInput());
         
-        templateSelect.addEventListener('change', () => {
-            const template = this.getTemplate(templateSelect.value);
-            if (template) {
-                templatePreview.innerHTML = `<strong>Subject:</strong> ${template.subject}<br><br>${template.body.replace(/\n/g, '<br>')}`;
-                // Fill the prompt with template
-                promptInput.value = template.prompt;
-                charCount.textContent = template.prompt.length;
-            } else {
-                templatePreview.textContent = 'Select a template to see a preview';
+        // Show tooltip on hover
+        this.voiceButton.addEventListener('mouseenter', () => {
+            if (voiceTooltip && !this.isListening) {
+                voiceTooltip.classList.add('show');
             }
         });
-
-        // Form submission
-        const form = this.modal.querySelector('#composeForm');
-        form.addEventListener('submit', (e) => this.handleGenerate(e));
-
-        // Copy button
-        const copyBtn = this.modal.querySelector('#copyButton');
-        copyBtn.addEventListener('click', () => this.copyToClipboard());
-
-        // Insert button
-        const insertBtn = this.modal.querySelector('#insertButton');
-        insertBtn.addEventListener('click', () => this.insertIntoGmail());
-
-        // Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.modal.classList.contains('active')) {
-                this.closeModal();
+        
+        // Hide tooltip on mouse leave
+        this.voiceButton.addEventListener('mouseleave', () => {
+            if (voiceTooltip) {
+                voiceTooltip.classList.remove('show');
+            }
+        });
+        
+        // Update tooltip text based on state
+        this.voiceButton.addEventListener('click', () => {
+            if (voiceTooltip) {
+                voiceTooltip.textContent = this.isListening ? 'Click to stop' : 'Click to speak';
             }
         });
     }
+
+    // ========== ADD THE CLEAR BUTTON CODE RIGHT HERE ==========
+    
+    // Clear button functionality
+    const clearButton = this.modal.querySelector('#clearInputBtn');
+    if (clearButton) {
+        clearButton.addEventListener('click', () => this.clearPromptText());
+    }
+
+    // ========== REST OF YOUR EXISTING CODE ==========
+
+    // Stop voice input when modal is closed
+    const originalCloseHandler = () => {
+        // Stop voice input first
+        if (this.isListening) {
+            this.stopVoiceInput();
+        }
+        this.closeModal();
+    };
+    
+    // Update close button to stop voice input
+    closeBtn.removeEventListener('click', () => this.closeModal());
+    closeBtn.addEventListener('click', originalCloseHandler);
+    
+    // Update overlay click to stop voice input
+    this.modal.removeEventListener('click', (e) => {
+        if (e.target === this.modal) {
+            this.closeModal();
+        }
+    });
+    this.modal.addEventListener('click', (e) => {
+        if (e.target === this.modal) {
+            if (this.isListening) {
+                this.stopVoiceInput();
+            }
+            this.closeModal();
+        }
+    });
+}
 
     getTemplate(templateId) {
-        const templates = {
-            'meeting-request': {
-                subject: 'Meeting Request - [Topic]',
-                prompt: 'Write a professional email requesting a meeting to discuss [topic]. Suggest a few time slots for next week.',
-                body: 'Dear [Name],\n\nI hope this email finds you well. I would like to schedule a meeting to discuss [topic].\n\nWould any of the following times work for you?\n- [Day] at [Time]\n- [Day] at [Time]\n- [Day] at [Time]\n\nPlease let me know what works best for your schedule.\n\nBest regards,\n[Your Name]'
-            },
-            'project-update': {
-                subject: 'Project Update - [Project Name]',
-                prompt: 'Write a project update email covering progress, completed tasks, upcoming milestones, and any blockers.',
-                body: 'Hi Team,\n\nHere\'s our weekly project update:\n\nCompleted this week:\n• [Task 1]\n• [Task 2]\n\nIn progress:\n• [Task 3]\n• [Task 4]\n\nNext week:\n• [Upcoming task]\n\nBlockers:\n• [Any issues]\n\nBest,\n[Your Name]'
-            },
-            'deadline-reminder': {
-                subject: 'Reminder: [Task] Due [Date]',
-                prompt: 'Write a friendly reminder email about an upcoming deadline.',
-                body: 'Hi [Name],\n\nJust a friendly reminder that [task/deliverable] is due on [date].\n\nPlease let me know if you need any assistance or if there are any concerns about meeting this deadline.\n\nThanks,\n[Your Name]'
-            }
-        };
-        
-        return templates[templateId] || null;
-    }
+    const templates = {
+        'meeting-request': {
+            subject: 'Meeting Request - Project Discussion',
+            prompt: 'Write a professional email requesting a meeting to discuss the upcoming project timeline and deliverables. Suggest a few time slots for next week.',
+            body: `Dear [Name],
 
-    openModal() {
-        if (!this.modal) {
-            this.createModal();
-        }
-        this.modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
+I hope this email finds you well. I would like to schedule a meeting to discuss our upcoming project timeline and key deliverables.
+
+Would any of the following times work for your schedule?
+• Tuesday, [Date] at 2:00 PM - 3:00 PM
+• Wednesday, [Date] at 10:00 AM - 11:00 AM  
+• Thursday, [Date] at 3:00 PM - 4:00 PM
+
+Please let me know which option works best for you, or feel free to suggest alternative times.
+
+Best regards,
+[Your Name]`
+        },
         
-        // Focus on the textarea
-        setTimeout(() => {
-            const promptInput = this.modal.querySelector('#promptInput');
-            promptInput.focus();
-        }, 300);
+        'meeting-followup': {
+            subject: 'Follow-up: Action Items from Today\'s Meeting',
+            prompt: 'Write a follow-up email summarizing the key points discussed in today\'s meeting and listing the action items with assigned owners.',
+            body: `Hi Team,
+
+Thank you for attending today's productive meeting. Here's a summary of what we discussed and the action items moving forward:
+
+Key Discussion Points:
+• [Point 1]
+• [Point 2]
+• [Point 3]
+
+Action Items:
+• [Action 1] - Assigned to [Name] - Due: [Date]
+• [Action 2] - Assigned to [Name] - Due: [Date]
+• [Action 3] - Assigned to [Name] - Due: [Date]
+
+Our next meeting is scheduled for [Date] at [Time]. Please reach out if you have any questions.
+
+Best,
+[Your Name]`
+        },
+        
+        'project-update': {
+            subject: 'Project Update - [Project Name] Weekly Status',
+            prompt: 'Write a comprehensive project update email covering progress, completed tasks, upcoming milestones, and any blockers or concerns.',
+            body: `Hi Team,
+
+Here's our weekly project update for [Project Name]:
+
+✅ Completed This Week:
+• [Task 1] - Delivered on schedule
+• [Task 2] - Successfully implemented
+• [Task 3] - Testing completed
+
+🔄 In Progress:
+• [Task 4] - 75% complete, on track for Friday
+• [Task 5] - Currently in review phase
+• [Task 6] - Development started
+
+📅 Coming Up Next Week:
+• [Upcoming task 1]
+• [Upcoming task 2]
+• [Milestone deadline on Friday]
+
+⚠️ Blockers/Concerns:
+• [Issue 1] - Need approval from [Department]
+• [Issue 2] - Waiting for external vendor response
+
+Overall Status: 🟢 On Track
+
+Best regards,
+[Your Name]`
+        },
+        
+        'deadline-reminder': {
+            subject: 'Friendly Reminder: [Task] Due [Date]',
+            prompt: 'Write a polite but clear reminder email about an upcoming deadline, offering support if needed.',
+            body: `Hi [Name],
+
+I hope you're doing well. This is a friendly reminder that [task/deliverable] is due on [date].
+
+Current status check:
+• Is everything on track for the deadline?
+• Do you need any additional resources or support?
+• Are there any potential blockers I should be aware of?
+
+Please don't hesitate to reach out if you need any assistance or if we need to discuss the timeline.
+
+Thanks for your attention to this!
+
+Best,
+[Your Name]`
+        },
+        
+        'introduction': {
+            subject: 'Introduction - [Your Name] from [Company]',
+            prompt: 'Write a professional introduction email for networking or business purposes, highlighting your background and purpose for reaching out.',
+            body: `Dear [Name],
+
+I hope this email finds you well. My name is [Your Name], and I'm [Your Position] at [Company Name].
+
+I'm reaching out because [reason for connection - mutual contact, shared interest, business opportunity, etc.]. I believe there could be valuable synergies between our work in [relevant area].
+
+A bit about my background:
+• [Key experience/achievement 1]
+• [Key experience/achievement 2]
+• [Relevant expertise or interest]
+
+I would love the opportunity to connect and learn more about your work at [Their Company]. Would you be open to a brief 15-20 minute call in the coming weeks?
+
+Thank you for your time, and I look forward to hearing from you.
+
+Best regards,
+[Your Name]
+[Your Title]
+[Company Name]
+[Contact Information]`
+        },
+        
+        'thank-interview': {
+            subject: 'Thank You - [Position] Interview',
+            prompt: 'Write a professional thank you email after a job interview, reiterating interest and highlighting key qualifications.',
+            body: `Dear [Interviewer Name],
+
+Thank you for taking the time to meet with me today to discuss the [Position Title] role at [Company Name]. I thoroughly enjoyed our conversation about [specific topic discussed] and learning more about [something specific about the role/company].
+
+Our discussion reinforced my enthusiasm for this opportunity. I'm particularly excited about [specific aspect of the role] and believe my experience in [relevant skill/experience] would enable me to make a meaningful contribution to your team.
+
+I wanted to mention that [additional relevant point you forgot to mention or want to emphasize].
+
+Please don't hesitate to reach out if you need any additional information. I look forward to the next steps in the process.
+
+Thank you again for your time and consideration.
+
+Best regards,
+[Your Name]
+[Your Phone Number]
+[Your Email]`
+        },
+        
+        'sick-leave': {
+            subject: 'Sick Leave - [Your Name] - [Date]',
+            prompt: 'Write a professional sick leave notification email informing about absence and coverage arrangements.',
+            body: `Dear [Manager Name],
+
+I am writing to inform you that I am feeling unwell today and will not be able to come to work. I expect to return on [expected return date], but will keep you updated if my condition changes.
+
+Coverage arrangements:
+• [Urgent task 1] - [Colleague name] has been briefed and can handle this
+• [Meeting/commitment] - I have notified [relevant people] and rescheduled for [date]
+• [Ongoing project] - No immediate action required, will catch up upon return
+
+I will monitor my email periodically for any urgent matters, but may have delayed responses.
+
+Thank you for understanding. I will keep you posted on my recovery.
+
+Best regards,
+[Your Name]`
+        },
+        
+        'vacation-request': {
+            subject: 'Vacation Request - [Dates]',
+            prompt: 'Write a professional vacation request email with dates, coverage plans, and transition details.',
+            body: `Dear [Manager Name],
+
+I would like to request vacation time from [start date] to [end date], returning to work on [return date]. This will be [number] working days total.
+
+Preparation and Coverage Plan:
+• All current projects will be up to date before my departure
+• [Colleague name] has agreed to cover urgent matters in my absence
+• [Specific responsibility] will be handled by [person/plan]
+• I will complete [specific tasks] before leaving
+
+Transition Details:
+• Client meetings scheduled during this period have been rescheduled
+• All deliverables due during my absence will be completed beforehand
+• Emergency contact: I will have limited availability but can be reached at [contact method] for critical issues only
+
+I believe this timing works well as [reason - low activity period, after project completion, etc.].
+
+Please let me know if you need any additional information or if there are concerns about this timing.
+
+Thank you for considering my request.
+
+Best regards,
+[Your Name]`
+        },
+        
+        'resignation': {
+            subject: 'Resignation Notice - [Your Name]',
+            prompt: 'Write a professional resignation letter with notice period, transition plans, and gratitude.',
+            body: `Dear [Manager Name],
+
+Please accept this letter as my formal notice of resignation from my position as [Your Job Title] at [Company Name]. My last day of employment will be [last working day], providing [notice period] notice as required.
+
+This decision was not made lightly. I have accepted a position that will allow me to [brief reason - career growth, new challenges, etc.].
+
+Transition Plan:
+• I am committed to ensuring a smooth transition of my responsibilities
+• I will complete [specific projects/tasks] before my departure
+• I am happy to assist in training my replacement or documenting processes
+• All current projects and client relationships will be properly handed over
+
+I want to express my sincere gratitude for the opportunities for professional and personal growth during my time here. I have enjoyed working with the team and appreciate the support and guidance I've received.
+
+Please let me know how I can help make this transition as smooth as possible.
+
+Thank you for your understanding.
+
+Sincerely,
+[Your Name]`
+        },
+        
+        'complaint': {
+            subject: 'Concern Regarding [Issue]',
+            prompt: 'Write a professional complaint email that clearly states the issue, impact, and desired resolution while maintaining a constructive tone.',
+            body: `Dear [Recipient Name],
+
+I am writing to bring to your attention a concern regarding [specific issue] that occurred on [date/timeframe].
+
+Issue Description:
+[Clear, factual description of what happened]
+
+Impact:
+• [Specific impact 1]
+• [Specific impact 2]
+• [How this affects work/service/etc.]
+
+I have attempted to resolve this by [previous actions taken], but the issue persists.
+
+Requested Resolution:
+• [Specific action desired]
+• [Timeline expectation]
+• [Any follow-up needed]
+
+I believe this can be resolved promptly and am happy to discuss this matter further at your convenience. I appreciate your attention to this matter and look forward to a swift resolution.
+
+Please let me know the next steps or if you need any additional information.
+
+Best regards,
+[Your Name]
+[Contact Information]`
+        },
+        
+        'feedback': {
+            subject: 'Feedback on [Topic/Project/Experience]',
+            prompt: 'Write a constructive feedback email that provides specific observations, suggestions for improvement, and positive reinforcement.',
+            body: `Dear [Name],
+
+I wanted to share some feedback regarding [specific topic/project/interaction] from [timeframe].
+
+What Went Well:
+• [Specific positive observation 1]
+• [Specific positive observation 2]
+• [Recognition of good work/effort]
+
+Areas for Improvement:
+• [Specific observation with constructive suggestion]
+• [Another area with actionable advice]
+• [Resource or support that might help]
+
+Overall Impression:
+[Balanced summary that acknowledges strengths while addressing areas for growth]
+
+I appreciate [specific thing you appreciated] and believe that focusing on [improvement area] will help achieve even better results in the future.
+
+I'm happy to discuss this feedback further or provide additional support as needed.
+
+Best regards,
+[Your Name]`
+        },
+        
+        'proposal': {
+            subject: 'Business Proposal - [Project/Service Name]',
+            prompt: 'Write a compelling business proposal email outlining a solution, benefits, timeline, and next steps.',
+            body: `Dear [Client Name],
+
+Thank you for the opportunity to propose a solution for [client's need/challenge].
+
+Proposed Solution:
+We recommend [solution overview] that will address your key requirements:
+• [Benefit 1]
+• [Benefit 2]
+• [Benefit 3]
+
+Project Scope:
+• [Deliverable 1] - [Description]
+• [Deliverable 2] - [Description]
+• [Deliverable 3] - [Description]
+
+Timeline:
+• Phase 1: [Duration] - [Key activities]
+• Phase 2: [Duration] - [Key activities]
+• Project completion: [End date]
+
+Investment:
+• Total project cost: [Amount]
+• Payment terms: [Terms]
+• ROI expectation: [Expected return/value]
+
+Why Choose Us:
+• [Key differentiator 1]
+• [Relevant experience/expertise]
+• [Client success story or testimonial]
+
+Next Steps:
+I would love to schedule a call to discuss this proposal in detail and answer any questions you might have.
+
+Thank you for your consideration. I look forward to the opportunity to work together.
+
+Best regards,
+[Your Name]
+[Title]
+[Company]
+[Contact Information]`
+        }
+    };
+    
+    return templates[templateId] || null;
+}
+
+async openModal() {
+    if (!this.modal) {
+        this.createModal();
     }
+    this.modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Focus on the textarea
+    setTimeout(() => {
+        const promptInput = this.modal.querySelector('#promptInput');
+        promptInput.focus();
+    }, 300);
+    
+    // 🔥 NEW: Load and show signature status
+    try {
+        const signaturePrefs = await this.loadUserSignaturePreferences();
+        if (signaturePrefs?.hasPreferences) {
+            this.updateSignatureStatus(true);
+            console.log('✅ Signature preferences available for compose');
+            
+            // Show a subtle notification that signature is available
+            setTimeout(() => {
+                this.showNotification('📝 Your saved signature will be included', 'info');
+            }, 1000);
+        } else {
+            console.log('ℹ️ No signature preferences found for compose');
+        }
+    } catch (error) {
+        console.error('Error loading signature preferences:', error);
+    }
+    
+    // Show voice input hint after modal opens
+    setTimeout(() => {
+        this.showVoiceHint();
+    }, 500);
+}
+
+
+showVoiceHint() {
+    // Check if speech recognition is supported
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        return; // Don't show hint if voice input not supported
+    }
+    
+    const hint = document.createElement('div');
+    hint.className = 'modal-voice-hint';
+    hint.innerHTML = `
+        <div class="hint-icon">🎤</div>
+        <div>You can use voice input! Click the microphone button to speak your email prompt.</div>
+    `;
+    
+    document.body.appendChild(hint);
+    
+    // Show the hint
+    setTimeout(() => {
+        hint.classList.add('show');
+    }, 100);
+    
+    // Hide the hint after 3 seconds
+    setTimeout(() => {
+        hint.classList.remove('show');
+        setTimeout(() => {
+            if (hint.parentNode) {
+                hint.parentNode.removeChild(hint);
+            }
+        }, 400);
+    }, 3000);
+}
+
+clearPromptText() {
+    const promptInput = this.modal.querySelector('#promptInput');
+    const charCount = this.modal.querySelector('#charCount');
+    const clearBtn = this.modal.querySelector('#clearInputBtn');
+    
+    if (promptInput.value.trim() === '') {
+        this.showNotification('Text area is already empty!', 'info');
+        return;
+    }
+    
+    // Add clearing animation
+    clearBtn.classList.add('clearing');
+    
+    // Clear the text
+    setTimeout(() => {
+        promptInput.value = '';
+        charCount.textContent = '0';
+        promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+        promptInput.focus();
+        this.showNotification('✨ Text cleared!', 'success');
+        clearBtn.classList.remove('clearing');
+    }, 300);
+}
+
 
     closeModal() {
-        this.modal.classList.remove('active');
-        document.body.style.overflow = '';
-        this.resetForm();
+    this.modal.classList.remove('active');
+    document.body.style.overflow = '';
+    this.resetForm();
+    
+    // Stop voice input if active
+    if (this.isListening) {
+        this.stopVoiceInput();
     }
+    
+    // Remove any lingering voice hints
+    const hints = document.querySelectorAll('.modal-voice-hint');
+    hints.forEach(hint => {
+        if (hint.parentNode) {
+            hint.parentNode.removeChild(hint);
+        }
+    });
+}
 
     resetForm() {
         const form = this.modal.querySelector('#composeForm');
@@ -1053,170 +2633,227 @@ class GmailComposeFeature {
             content.classList.toggle('active', index === 0);
         });
     }
+    
 
-    async handleGenerate(e) {
-        e.preventDefault();
-        
-        const generateButton = this.modal.querySelector('#generateButton');
-        const resultSection = this.modal.querySelector('#resultSection');
-        const errorMessage = this.modal.querySelector('#errorMessage');
-        
-        // Hide previous results
-        resultSection.classList.remove('show');
-        
-        // Show loading state
-        generateButton.classList.add('loading');
-        generateButton.disabled = true;
-        
-        // Collect all form data
-        const formData = {
-            // Basic options
-            prompt: this.modal.querySelector('#promptInput').value,
-            tone: this.modal.querySelector('#toneSelect').value,
-            length: this.modal.querySelector('#lengthSelect').value,
-            language: this.modal.querySelector('#languageSelect').value,
-            responseType: this.modal.querySelector('#responseTypeSelect').value,
-            recipientContext: this.modal.querySelector('#recipientContext').value,
-            
-            // Checkboxes
-            includeGreeting: this.modal.querySelector('#includeGreeting').checked,
-            includeClosing: this.modal.querySelector('#includeClosing').checked,
-            includeSignature: this.modal.querySelector('#includeSignature').checked,
-            useEmojis: this.modal.querySelector('#useEmojis').checked,
-            
-            // Advanced options
-            greetingStyle: this.modal.querySelector('#greetingStyle').value,
-            voice: this.modal.querySelector('#voiceSelect').value,
-            complexity: this.modal.querySelector('#complexitySelect').value,
-            structure: this.modal.querySelector('#structureSelect').value,
-            subjectLine: this.modal.querySelector('#subjectLine').value,
-            openingSentence: this.modal.querySelector('#openingSentence').value,
-            closingLine: this.modal.querySelector('#closingLine').value,
-            includeThreadSummary: this.modal.querySelector('#includeThreadSummary').checked,
-            referencePastMessages: this.modal.querySelector('#referencePastMessages').checked,
-            autoInsert: this.modal.querySelector('#autoInsert').checked
-        };
-        
-        try {
-            // Call your API
-            const response = await fetch(`${this.API_URL}/api/compose`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to generate email');
-            }
-            
-            const data = await response.json();
-            
-            // Display results
-            this.modal.querySelector('#emailSubject').textContent = `Subject: ${data.subject}`;
-            this.modal.querySelector('#emailBody').textContent = data.body;
-            
-            resultSection.classList.add('show');
-            
-            // Scroll to results
-            resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            
-            // Auto-insert if selected
-            if (formData.autoInsert) {
-                setTimeout(() => {
-                    this.insertIntoGmail();
-                }, 500);
-            }
-            
-        } catch (error) {
-            console.error('Error generating email:', error);
-            
-            // For testing, use mock data
-            const mockResponse = this.generateMockEmail(formData);
-            
-            this.modal.querySelector('#emailSubject').textContent = `Subject: ${mockResponse.subject}`;
-            this.modal.querySelector('#emailBody').textContent = mockResponse.body;
-            
-            resultSection.classList.add('show');
-            resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } finally {
-            generateButton.classList.remove('loading');
-            generateButton.disabled = false;
-        }
-    }
+    // BLOCK 1: REPLACE handleGenerate method (around line 2466)
+// Find this method and replace it entirely:
 
-    generateMockEmail(formData) {
-        // Mock email generation based on options
-        let subject = formData.subjectLine || 'Project Update - Q1 Progress';
-        let body = '';
-        
-        // Greeting
-        if (formData.includeGreeting) {
-            switch (formData.greetingStyle) {
-                case 'firstname':
-                    body += 'Hi [First Name],\n\n';
-                    break;
-                case 'formal':
-                    body += 'Dear [Title] [Last Name],\n\n';
-                    break;
-                case 'team':
-                    body += 'Hello Team,\n\n';
-                    break;
-                case 'time':
-                    body += 'Good morning,\n\n';
-                    break;
-                default:
-                    body += 'Hi there,\n\n';
-            }
-        }
-        
-        // Opening
-        if (formData.openingSentence) {
-            body += formData.openingSentence + '\n\n';
-        } else {
-            body += 'I hope this email finds you well.\n\n';
-        }
-        
-        // Main content based on type
-        switch (formData.responseType) {
-            case 'accept':
-                body += 'I am pleased to confirm that I accept your proposal. ';
-                break;
-            case 'decline':
-                body += 'Thank you for considering me for this opportunity. After careful consideration, I must respectfully decline. ';
-                break;
-            case 'request':
-                body += 'I am writing to request additional information regarding the project. ';
-                break;
-            default:
-                body += 'I wanted to reach out regarding the matter we discussed. ';
-        }
-        
-        // Add structure based on selection
-        if (formData.structure === 'bullets') {
-            body += '\n\nKey points:\n• First point\n• Second point\n• Third point\n';
-        }
-        
-        // Add emojis if requested
-        if (formData.useEmojis) {
-            body = body.replace(/\./g, '. 😊');
-        }
-        
-        // Closing
-        if (formData.closingLine) {
-            body += '\n' + formData.closingLine;
-        } else if (formData.includeClosing) {
-            body += '\n\nLooking forward to your response.';
-        }
-        
-        // Signature
-        if (formData.includeSignature) {
-            body += '\n\nBest regards,\n[Your Name]';
-        }
-        
-        return { subject, body };
+// REPLACE your existing handleGenerate method with this fixed version:
+
+async handleGenerate(e) {
+    e.preventDefault();
+    
+    const generateButton = this.modal.querySelector('#generateButton');
+    const resultSection = this.modal.querySelector('#resultSection');
+    
+    // Hide previous results
+    resultSection.classList.remove('show');
+    
+    // Show loading state
+    generateButton.classList.add('loading');
+    generateButton.disabled = true;
+    
+    // 🔥 NEW: Load signature preferences
+    let userSignaturePreferences = null;
+    try {
+        userSignaturePreferences = await this.loadUserSignaturePreferences();
+        console.log('🔍 Loaded signature preferences for compose:', userSignaturePreferences);
+    } catch (error) {
+        console.error('Error loading signature preferences:', error);
     }
+    
+    // Collect all form data
+    const formData = {
+        // Basic options
+        prompt: this.modal.querySelector('#promptInput').value.trim(),
+        tone: this.modal.querySelector('#toneSelect').value,
+        length: this.modal.querySelector('#lengthSelect').value,
+        language: this.modal.querySelector('#languageSelect').value,
+        responseType: this.modal.querySelector('#responseTypeSelect').value,
+        recipientContext: this.modal.querySelector('#recipientContext').value,
+        
+        // Checkboxes
+        includeGreeting: this.modal.querySelector('#includeGreeting').checked,
+        includeClosing: this.modal.querySelector('#includeClosing').checked,
+        includeSignature: this.modal.querySelector('#includeSignature').checked,
+        useEmojis: this.modal.querySelector('#useEmojis').checked,
+        
+        // Advanced options
+        greetingStyle: this.modal.querySelector('#greetingStyle').value,
+        voice: this.modal.querySelector('#voiceSelect').value,
+        complexity: this.modal.querySelector('#complexitySelect').value,
+        structure: this.modal.querySelector('#structureSelect').value,
+        subjectLine: this.modal.querySelector('#subjectLine').value,
+        openingSentence: this.modal.querySelector('#openingSentence').value,
+        closingLine: this.modal.querySelector('#closingLine').value,
+        includeThreadSummary: this.modal.querySelector('#includeThreadSummary').checked,
+        referencePastMessages: this.modal.querySelector('#referencePastMessages').checked,
+        autoInsert: this.modal.querySelector('#autoInsert').checked,
+        
+        // 🔥 NEW: Include signature preferences
+        userPreferences: userSignaturePreferences,
+        
+        // Form tracking
+        _formStateId: this.formStateId,
+        _timestamp: Date.now()
+    };
+    
+    // Basic validation
+    if (!formData.prompt || formData.prompt.length < 10) {
+        this.showNotification('❌ Please enter a meaningful prompt (at least 10 characters)', 'error');
+        generateButton.classList.remove('loading');
+        generateButton.disabled = false;
+        return;
+    }
+    
+    try {
+        console.log('🚀 Calling API with signature data:', formData);
+        
+        // Cache busting
+        const cacheKey = `${this.formStateId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;    
+        const randomParam = Math.random().toString(36).substr(2, 15);
+        
+        // Call API
+        const response = await fetch(`${this.API_URL}/api/compose?_t=${cacheKey}&_r=${randomParam}&_state=${this.formStateId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Cache-Bust': cacheKey
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        if (!response.ok) {
+            let errorMessage = `API Error: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorMessage;
+            } catch {
+                const errorText = await response.text();
+                errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
+        }
+        
+        const data = await response.json();
+        console.log('✅ API Response with signature:', data);
+        
+        // Display results
+        const emailSubjectElement = this.modal.querySelector('#emailSubject');
+        const emailBodyElement = this.modal.querySelector('#emailBody');
+        
+        // Check if API returned a subject, otherwise use a fallback
+        const subjectText = data.subject || 'No Subject';
+        
+        // Display the subject and body
+        emailSubjectElement.textContent = `Subject: ${subjectText}`;
+        emailBodyElement.textContent = data.body || 'No email body generated';
+        
+        // Show results section
+        resultSection.classList.add('show');
+        
+        // Scroll to results
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Show success message with signature info
+        let successMessage = '✅ Email generated successfully!';
+        if (data.metadata?.hasUserPreferences) {
+            successMessage += ' (with your signature)';
+        }
+        this.showNotification(successMessage, 'success');
+        
+        // Auto-insert if selected
+        if (formData.autoInsert) {
+            setTimeout(() => {
+                this.insertIntoGmail();
+            }, 500);
+        }
+        
+    } catch (error) {
+        console.error('💥 Error generating email:', error);
+        this.showNotification(`❌ Failed to generate email: ${error.message}`, 'error');
+        
+    } finally {
+        generateButton.classList.remove('loading');
+        generateButton.disabled = false;
+    }
+}
+
+    // generateMockEmail(formData) {
+    //     // Mock email generation based on options
+    //     let subject = formData.subjectLine || 'Project Update - Q1 Progress';
+    //     let body = '';
+        
+    //     // Greeting
+    //     if (formData.includeGreeting) {
+    //         switch (formData.greetingStyle) {
+    //             case 'firstname':
+    //                 body += 'Hi [First Name],\n\n';
+    //                 break;
+    //             case 'formal':
+    //                 body += 'Dear [Title] [Last Name],\n\n';
+    //                 break;
+    //             case 'team':
+    //                 body += 'Hello Team,\n\n';
+    //                 break;
+    //             case 'time':
+    //                 body += 'Good morning,\n\n';
+    //                 break;
+    //             default:
+    //                 body += 'Hi there,\n\n';
+    //         }
+    //     }
+        
+    //     // Opening
+    //     if (formData.openingSentence) {
+    //         body += formData.openingSentence + '\n\n';
+    //     } else {
+    //         body += 'I hope this email finds you well.\n\n';
+    //     }
+        
+    //     // Main content based on type
+    //     switch (formData.responseType) {
+    //         case 'accept':
+    //             body += 'I am pleased to confirm that I accept your proposal. ';
+    //             break;
+    //         case 'decline':
+    //             body += 'Thank you for considering me for this opportunity. After careful consideration, I must respectfully decline. ';
+    //             break;
+    //         case 'request':
+    //             body += 'I am writing to request additional information regarding the project. ';
+    //             break;
+    //         default:
+    //             body += 'I wanted to reach out regarding the matter we discussed. ';
+    //     }
+        
+    //     // Add structure based on selection
+    //     if (formData.structure === 'bullets') {
+    //         body += '\n\nKey points:\n• First point\n• Second point\n• Third point\n';
+    //     }
+        
+    //     // Add emojis if requested
+    //     if (formData.useEmojis) {
+    //         body = body.replace(/\./g, '. 😊');
+    //     }
+        
+    //     // Closing
+    //     if (formData.closingLine) {
+    //         body += '\n' + formData.closingLine;
+    //     } else if (formData.includeClosing) {
+    //         body += '\n\nLooking forward to your response.';
+    //     }
+        
+    //     // Signature
+    //     if (formData.includeSignature) {
+    //         body += '\n\nBest regards,\n[Your Name]';
+    //     }
+        
+    //     return { subject, body };
+    // }
 
     copyToClipboard() {
         const subject = this.modal.querySelector('#emailSubject').textContent;
@@ -1246,60 +2883,135 @@ class GmailComposeFeature {
         }
     }
 
-    insertEmailContent() {
-        const subject = this.modal.querySelector('#emailSubject').textContent.replace('Subject: ', '');
-        const body = this.modal.querySelector('#emailBody').textContent;
-        
-        // Find subject field
-        const subjectField = document.querySelector('input[name="subjectbox"]');
-        
-        // Find body field
-        const bodyField = document.querySelector('[role="textbox"][aria-label*="Message Body"]') ||
-                         document.querySelector('.Am.Al.editable');
-        
-        if (subjectField && bodyField) {
-            // Insert subject
-            subjectField.value = subject;
-            subjectField.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            // Insert body
-            bodyField.innerHTML = body.replace(/\n/g, '<br>');
-            bodyField.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            this.showNotification('Email inserted into compose window!', 'success');
-            
-            // Close modal after a short delay
-            setTimeout(() => {
-                this.closeModal();
-            }, 1500);
-        } else {
-            this.showNotification('Could not find compose fields', 'error');
-        }
-    }
+    // ALSO REPLACE your insertEmailContent method with this fixed version:
 
-    showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            background: ${type === 'success' ? '#10b981' : '#ef4444'};
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 10000;
-            animation: slideUp 0.3s ease;
-        `;
-        notification.textContent = message;
+insertEmailContent() {
+    // 🔥 FIX: Properly extract the dynamic subject from the displayed text
+    const subjectElement = this.modal.querySelector('#emailSubject');
+    const bodyElement = this.modal.querySelector('#emailBody');
+    
+    // Extract subject by removing the "Subject: " prefix
+    const fullSubjectText = subjectElement.textContent || '';
+    const subject = fullSubjectText.replace(/^Subject:\s*/, '').trim();
+    
+    const body = bodyElement.textContent || '';
+    
+    console.log('📧 Inserting email content:', { subject, body: body.substring(0, 100) + '...' });
+    
+    // Find subject field
+    const subjectField = document.querySelector('input[name="subjectbox"]');
+    
+    // Find body field
+    const bodyField = document.querySelector('[role="textbox"][aria-label*="Message Body"]') ||
+                     document.querySelector('.Am.Al.editable');
+    
+    if (subjectField && bodyField) {
+        // Insert subject
+        subjectField.value = subject;
+        subjectField.dispatchEvent(new Event('input', { bubbles: true }));
         
-        document.body.appendChild(notification);
+        // Insert body (convert line breaks to HTML)
+        bodyField.innerHTML = body.replace(/\n/g, '<br>');
+        bodyField.dispatchEvent(new Event('input', { bubbles: true }));
         
+        this.showNotification('✅ Email inserted into compose window!', 'success');
+        
+        // Close modal after a short delay
         setTimeout(() => {
-            notification.remove();
-        }, 3000);
+            this.closeModal();
+        }, 1500);
+    } else {
+        console.error('❌ Could not find compose fields:', { subjectField, bodyField });
+        this.showNotification('❌ Could not find compose fields', 'error');
     }
+}
+    showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    
+    let backgroundColor;
+    switch(type) {
+        case 'success':
+            backgroundColor = '#10b981';
+            break;
+        case 'error':
+            backgroundColor = '#ef4444';
+            break;
+        case 'info':
+            backgroundColor = '#3b82f6';
+            break;
+        default:
+            backgroundColor = '#6b7280';
+    }
+    
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        background: ${backgroundColor};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        animation: slideUp 0.3s ease;
+        font-weight: 500;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+trackFormChanges() {
+    // Track when any form element changes to help with debugging
+    const formElements = [
+        '#promptInput',
+        '#toneSelect', 
+        '#lengthSelect', 
+        '#languageSelect', 
+        '#responseTypeSelect',
+        '#recipientContext', 
+        '#includeGreeting', 
+        '#includeClosing', 
+        '#includeSignature',
+        '#useEmojis', 
+        '#greetingStyle', 
+        '#voiceSelect', 
+        '#complexitySelect',
+        '#structureSelect', 
+        '#subjectLine', 
+        '#openingSentence', 
+        '#closingLine',
+        '#includeThreadSummary', 
+        '#referencePastMessages', 
+        '#autoInsert'
+    ];
+    
+    formElements.forEach(selector => {
+        const element = this.modal.querySelector(selector);
+        if (element) {
+            element.addEventListener('change', () => {
+                // UPDATE FORM STATE ID ON EVERY CHANGE
+                this.formStateId = Date.now() + Math.random();
+                
+                const value = element.type === 'checkbox' ? element.checked : element.value;
+                console.log(`🔄 Form changed: ${selector} = ${value}, New StateID: ${this.formStateId}`);
+            });
+            
+            // Also track input events for text fields
+            if (element.type === 'text' || element.tagName === 'TEXTAREA') {
+                element.addEventListener('input', () => {
+                    // UPDATE FORM STATE ID ON TEXT INPUT TOO
+                    this.formStateId = Date.now() + Math.random();
+                    console.log(`📝 Text input: ${selector} = "${element.value.substring(0, 50)}...", New StateID: ${this.formStateId}`);
+                });
+            }
+        }
+    });
+}
 }
 
 // Add animation keyframes
@@ -1320,7 +3032,7 @@ document.head.appendChild(animationStyle);
 
 // Initialize
 const gmailCompose = new GmailComposeFeature();
-
+window.gmailCompose = gmailCompose;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => gmailCompose.init());
 } else {
