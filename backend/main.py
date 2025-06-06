@@ -934,6 +934,7 @@ EMAIL REQUIREMENTS:
 TONE & STYLE:
 - Tone: {compose_request.tone} - {tone_instruction}
 - Language: {compose_request.language}
+- IMPORTANT: Always write the email in English, even if the user input contains Hinglish or mixed languages, unless the user specifically requests to write in Hindi
 - Voice: {compose_request.voice} person
 - Complexity: {compose_request.complexity}
 
