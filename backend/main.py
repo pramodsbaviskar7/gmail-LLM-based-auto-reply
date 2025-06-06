@@ -782,11 +782,29 @@ class ComposeResponse(BaseModel):
     cached: bool = Field(..., description="Whether response was cached")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
 
+# Add this language mapping at the top of your build_compose_prompt function
+
 def build_compose_prompt(compose_request: ComposeRequest, user_info: dict) -> str:
     """
     Build a comprehensive system prompt for email composition with proper formatting
     Now includes dynamic signature handling based on user preferences AND proper structure formatting
     """
+    
+    # 🔥 NEW: Enhanced language-specific instructions with proper script handling
+    language_instructions = {
+        "english": "Write the email in English. If user input contains Hinglish (Hindi-English mix), understand the meaning and write the email in proper English. If user explicitly requests a different language in their natural input (e.g., 'hindi bhasha mein' means write in PROPER HINDI SCRIPT देवनागरी, 'marathi mein likho' means write in PROPER MARATHI SCRIPT), follow that specific request instead",
+        "spanish": "Write the email in Spanish (Español). If user input contains Hinglish, understand the meaning and translate to Spanish. If user explicitly requests a different language in their natural input, follow that specific request instead", 
+        "french": "Write the email in French (Français). If user input contains Hinglish, understand the meaning and translate to French. If user explicitly requests a different language in their natural input, follow that specific request instead", 
+        "german": "Write the email in German (Deutsch). If user input contains Hinglish, understand the meaning and translate to German. If user explicitly requests a different language in their natural input, follow that specific request instead",
+        "italian": "Write the email in Italian (Italiano). If user input contains Hinglish, understand the meaning and translate to Italian. If user explicitly requests a different language in their natural input, follow that specific request instead",
+        "portuguese": "Write the email in Portuguese (Português). If user input contains Hinglish, understand the meaning and translate to Portuguese. If user explicitly requests a different language in their natural input, follow that specific request instead",
+        "chinese": "Write the email in Chinese (中文). If user input contains Hinglish, understand the meaning and translate to Chinese. If user explicitly requests a different language in their natural input, follow that specific request instead",
+        "japanese": "Write the email in Japanese (日本語). If user input contains Hinglish, understand the meaning and translate to Japanese. If user explicitly requests a different language in their natural input, follow that specific request instead",
+        "hindi": "Write the email in PROPER HINDI using देवनागरी script (हिंदी भाषा में). If user input contains Hinglish, understand the meaning and write in PURE HINDI SCRIPT, NOT Hinglish. If user explicitly requests a different language in their natural input, follow that specific request instead"
+    }
+    
+    # Get language instruction
+    language_instruction = language_instructions.get(compose_request.language, "Write the email in English. If user input contains Hinglish, understand the meaning and write in proper English. If user explicitly requests a different language in their natural input, follow that specific request instead")
     
     # Check if we have real user preferences
     has_user_preferences = (
@@ -1005,10 +1023,15 @@ EMAIL REQUIREMENTS:
 
 TONE & STYLE:
 - Tone: {compose_request.tone} - {tone_instruction}
-- Language: {compose_request.language}
-- IMPORTANT: Always write the email in English, even if the user input contains Hinglish or mixed languages, unless the user specifically requests to write in Hindi
+- Language: {compose_request.language} - {language_instruction}
 - Voice: {compose_request.voice} person
 - Complexity: {compose_request.complexity}
+- INPUT HANDLING: Understand Hinglish (Hindi-English mix) input and convert appropriately
+- LANGUAGE SELECTION LOGIC: 
+  1. Check user prompt for explicit language requests (e.g., "hindi bhasha mein", "write in Spanish")
+  2. If found, use that language (overrides dropdown)
+  3. If not found, use dropdown selection: {compose_request.language}
+  4. Default fallback: English
 
 CONTENT REQUIREMENTS:
 - {greeting_instruction}
@@ -1037,12 +1060,38 @@ CRITICAL REMINDERS:
 5. Follow the exact format structure shown in examples above
 6. Each paragraph must be on its own line with blank lines between sections
 7. MANDATORY: Apply the {compose_request.structure.upper()} structure formatting as specified
-{'8. Use the EXACT signature information provided above' if has_user_preferences else '8. Use appropriate signature format'}
+8. LANGUAGE PRIORITY SYSTEM (CRITICAL):
+   - IF user explicitly requests a language in their prompt text → Use THAT language (overrides dropdown)
+     Examples: "hindi bhasha mein", "marathi mein likho", "write in Spanish"
+   - IF no explicit language request in prompt → Use dropdown selection ({compose_request.language})
+   - IF neither specified → Default to English
+   
+   Detect explicit requests like:
+   - "hindi bhasha mein" → Write in PROPER HINDI (हिंदी में, not Hinglish)
+   - "marathi mein likho" → Write in PROPER MARATHI  
+   - "mail gujarati bhasha mein" → Write in PROPER GUJARATI
+   - "write in [language]" → Write in that language
+   - "[language] mein likho/chahiye/dena" → Write in that PROPER language
+9. INPUT PROCESSING: If user input contains Hinglish (Hindi+English mix), understand the meaning and write the email appropriately
+10. LANGUAGE CLARITY: 
+    - Hindi = Write in देवनागरी script (हिंदी भाषा में)
+    - Marathi = Write in देवनागरी script (मराठी भाषा में)
+    - Gujarati = Write in ગુજરાતી script
+    - Do NOT use Roman script when Indian languages are requested
+{'11. Use the EXACT signature information provided above' if has_user_preferences else '11. Use appropriate signature format'}
 
-Write a properly formatted email that follows all these requirements, especially the {compose_request.structure.upper()} structure formatting.
+Write a properly formatted email that follows all these requirements, especially the {compose_request.structure.upper()} structure formatting. 
+
+LANGUAGE SELECTION PRIORITY:
+1. FIRST: Check if user explicitly requests a language in their prompt (e.g., "hindi bhasha mein", "write in Spanish")
+2. SECOND: If no explicit request, use dropdown selection ({compose_request.language})
+3. THIRD: If neither specified, default to English
+
+When user requests "hindi bhasha mein" or similar, write in PROPER SCRIPT (देवनागरी for Hindi), NOT Hinglish.
 """
     
     return system_prompt
+
 
 # Helper function to generate subject line
 def generate_subject_line(prompt: str, response_type: str, custom_subject: Optional[str] = None) -> str:
