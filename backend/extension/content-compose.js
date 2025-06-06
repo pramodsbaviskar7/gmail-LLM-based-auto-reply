@@ -7,13 +7,14 @@ class GmailComposeFeature {
         this.composeButton = null;
         this.initialized = false;
         this.darkMode = false;
-        this.API_URL = 'https://gmail-llm-based-auto-reply.vercel.app'; 
-        this.BACKUP_API_URL = 'https://gmail-llm-based-auto-reply.onrender.com';
+        this.API_URL = 'https://gmail-llm-based-auto-reply.onrender.com'; 
+        this.BACKUP_API_URL = 'https://gmail-llm-based-auto-reply.vercel.app';
         // ADD THESE NEW LINES:
         this.recognition = null;
         this.isListening = false;
         this.voiceButton = null;
         this.formStateId = Date.now();
+        this.preferencesCache = new Map(); // Cache for signature preferences
 
     }
 
@@ -1636,42 +1637,237 @@ updateVoiceIndicator(interimText) {
 }
 async loadUserSignaturePreferences() {
     return new Promise((resolve) => {
-        // Check if Chrome extension APIs are available
-        if (typeof chrome === 'undefined' || !chrome.storage) {
-            console.warn('Chrome storage not available for signature preferences');
-            resolve(null);
-            return;
-        }
-        
-        const storage = chrome.storage.sync || chrome.storage.local;
-        
-        storage.get(['userEmail', 'userInfo'], function(result) {
-            if (chrome.runtime.lastError) {
-                console.error('Error loading signature preferences:', chrome.runtime.lastError);
-                resolve(null);
-                return;
-            }
+        // Multiple attempts with different strategies
+        const attemptLoad = async (attempt = 1, maxAttempts = 3) => {
+            console.log(`🔄 Loading signature preferences - Attempt ${attempt}/${maxAttempts}`);
             
-            console.log('📝 Loaded signature preferences:', result);
-            
-            // Construct signature preferences object (same format as auto-reply)
-            if (result.userInfo || result.userEmail) {
-                const preferences = {
-                    hasPreferences: true,
-                    email: result.userInfo?.email || result.userEmail || null,
-                    full_name: result.userInfo?.full_name || null,
-                    linkedin: result.userInfo?.linkedin || null,
-                    mobile: result.userInfo?.mobile || null
+            try {
+                // Check if Chrome extension APIs are available
+                if (typeof chrome === 'undefined') {
+                    console.warn('❌ Chrome object not available');
+                    if (attempt < maxAttempts) {
+                        setTimeout(() => attemptLoad(attempt + 1, maxAttempts), 500);
+                        return;
+                    }
+                    resolve(null);
+                    return;
+                }
+
+                if (!chrome.storage) {
+                    console.warn('❌ Chrome storage not available');
+                    if (attempt < maxAttempts) {
+                        setTimeout(() => attemptLoad(attempt + 1, maxAttempts), 500);
+                        return;
+                    }
+                    resolve(null);
+                    return;
+                }
+
+                // Try both sync and local storage with timeout
+                const loadWithTimeout = (storageAPI, timeout = 2000) => {
+                    return new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => {
+                            reject(new Error('Storage timeout'));
+                        }, timeout);
+
+                        storageAPI.get(['userEmail', 'userInfo', 'userPreferences'], (result) => {
+                            clearTimeout(timer);
+                            
+                            if (chrome.runtime.lastError) {
+                                reject(new Error(chrome.runtime.lastError.message));
+                                return;
+                            }
+                            
+                            resolve(result);
+                        });
+                    });
                 };
+
+                let result;
                 
-                console.log('✅ Signature preferences loaded for compose:', preferences);
-                resolve(preferences);
-            } else {
-                console.log('ℹ️ No signature preferences found');
-                resolve(null);
+                // Try sync storage first
+                if (chrome.storage.sync) {
+                    try {
+                        console.log('🔍 Trying chrome.storage.sync...');
+                        result = await loadWithTimeout(chrome.storage.sync);
+                        console.log('✅ Sync storage successful:', result);
+                    } catch (syncError) {
+                        console.warn('⚠️ Sync storage failed:', syncError.message);
+                        
+                        // Fallback to local storage
+                        if (chrome.storage.local) {
+                            try {
+                                console.log('🔍 Fallback to chrome.storage.local...');
+                                result = await loadWithTimeout(chrome.storage.local);
+                                console.log('✅ Local storage successful:', result);
+                            } catch (localError) {
+                                console.warn('⚠️ Local storage also failed:', localError.message);
+                                throw new Error('Both storage methods failed');
+                            }
+                        } else {
+                            throw new Error('No storage methods available');
+                        }
+                    }
+                } else if (chrome.storage.local) {
+                    try {
+                        console.log('🔍 Only local storage available...');
+                        result = await loadWithTimeout(chrome.storage.local);
+                        console.log('✅ Local storage successful:', result);
+                    } catch (localError) {
+                        console.warn('⚠️ Local storage failed:', localError.message);
+                        throw new Error('Local storage failed');
+                    }
+                } else {
+                    throw new Error('No storage APIs available');
+                }
+
+                // Process the result
+                console.log('📊 Raw storage result:', result);
+                
+                // Check multiple possible data structures
+                let preferences = null;
+                
+                // Method 1: Direct userInfo object
+                if (result.userInfo && typeof result.userInfo === 'object') {
+                    preferences = {
+                        hasPreferences: true,
+                        email: result.userInfo.email || null,
+                        full_name: result.userInfo.full_name || result.userInfo.fullName || null,
+                        linkedin: result.userInfo.linkedin || null,
+                        mobile: result.userInfo.mobile || result.userInfo.phone || null
+                    };
+                    console.log('✅ Found userInfo object:', preferences);
+                }
+                
+                // Method 2: Check userPreferences
+                else if (result.userPreferences && typeof result.userPreferences === 'object') {
+                    preferences = {
+                        hasPreferences: true,
+                        email: result.userPreferences.email || null,
+                        full_name: result.userPreferences.full_name || result.userPreferences.fullName || null,
+                        linkedin: result.userPreferences.linkedin || null,
+                        mobile: result.userPreferences.mobile || result.userPreferences.phone || null
+                    };
+                    console.log('✅ Found userPreferences object:', preferences);
+                }
+                
+                // Method 3: Check individual fields
+                else if (result.userEmail || Object.keys(result).some(key => key.includes('user'))) {
+                    preferences = {
+                        hasPreferences: true,
+                        email: result.userEmail || result.email || null,
+                        full_name: result.userFullName || result.fullName || result.userName || null,
+                        linkedin: result.userLinkedin || result.linkedin || null,
+                        mobile: result.userMobile || result.mobile || result.phone || null
+                    };
+                    console.log('✅ Found individual fields:', preferences);
+                }
+                
+                // Method 4: Check all keys for any user data
+                else {
+                    const allKeys = Object.keys(result);
+                    console.log('🔍 All available keys:', allKeys);
+                    
+                    // Look for any keys that might contain user data
+                    const userKeys = allKeys.filter(key => 
+                        key.toLowerCase().includes('user') || 
+                        key.toLowerCase().includes('email') ||
+                        key.toLowerCase().includes('name') ||
+                        key.toLowerCase().includes('signature')
+                    );
+                    
+                    if (userKeys.length > 0) {
+                        console.log('🔍 Found potential user keys:', userKeys);
+                        
+                        preferences = {
+                            hasPreferences: true,
+                            email: null,
+                            full_name: null,
+                            linkedin: null,
+                            mobile: null
+                        };
+                        
+                        // Try to map the found keys
+                        userKeys.forEach(key => {
+                            const value = result[key];
+                            if (typeof value === 'string' && value.trim()) {
+                                if (key.toLowerCase().includes('email')) {
+                                    preferences.email = value;
+                                } else if (key.toLowerCase().includes('name')) {
+                                    preferences.full_name = value;
+                                } else if (key.toLowerCase().includes('linkedin')) {
+                                    preferences.linkedin = value;
+                                } else if (key.toLowerCase().includes('mobile') || key.toLowerCase().includes('phone')) {
+                                    preferences.mobile = value;
+                                }
+                            }
+                        });
+                        
+                        console.log('✅ Mapped user data:', preferences);
+                    }
+                }
+
+                // Validate preferences
+                if (preferences && (preferences.email || preferences.full_name || preferences.linkedin || preferences.mobile)) {
+                    console.log('🎉 Successfully loaded signature preferences:', preferences);
+                    resolve(preferences);
+                } else {
+                    console.log('ℹ️ No valid signature preferences found');
+                    
+                    if (attempt < maxAttempts) {
+                        console.log(`🔄 Retrying in ${attempt * 500}ms...`);
+                        setTimeout(() => attemptLoad(attempt + 1, maxAttempts), attempt * 500);
+                        return;
+                    }
+                    
+                    resolve(null);
+                }
+
+            } catch (error) {
+                console.error(`❌ Attempt ${attempt} failed:`, error);
+                
+                if (attempt < maxAttempts) {
+                    console.log(`🔄 Retrying in ${attempt * 500}ms...`);
+                    setTimeout(() => attemptLoad(attempt + 1, maxAttempts), attempt * 500);
+                } else {
+                    console.error('💥 All attempts failed, returning null');
+                    resolve(null);
+                }
             }
-        });
+        };
+
+        // Start the loading process
+        attemptLoad();
     });
+}
+
+async loadUserSignaturePreferencesWithCache() {
+    // Use a simple in-memory cache with 30-second expiry
+    const cacheKey = 'signaturePreferences';
+    const cacheExpiry = 30000; // 30 seconds
+    
+    if (!this.preferencesCache) {
+        this.preferencesCache = new Map();
+    }
+    
+    const cached = this.preferencesCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && (now - cached.timestamp) < cacheExpiry) {
+        console.log('📦 Using cached signature preferences:', cached.data);
+        return cached.data;
+    }
+    
+    console.log('🔄 Cache miss or expired, loading fresh preferences...');
+    const preferences = await this.loadUserSignaturePreferences();
+    
+    // Cache the result
+    this.preferencesCache.set(cacheKey, {
+        data: preferences,
+        timestamp: now
+    });
+    
+    return preferences;
 }
 
 // 🔥 ADD THIS HELPER FUNCTION TOO
@@ -2514,28 +2710,42 @@ async openModal() {
         promptInput.focus();
     }, 300);
     
-    // 🔥 NEW: Load and show signature status
+    // 🔥 IMPROVED: Load and show signature status with better error handling
     try {
-        const signaturePrefs = await this.loadUserSignaturePreferences();
+        console.log('🚀 Loading signature preferences...');
+        
+        // Use the cached version for better performance
+        const signaturePrefs = await this.loadUserSignaturePreferencesWithCache();
+        
         if (signaturePrefs?.hasPreferences) {
             this.updateSignatureStatus(true);
-            console.log('✅ Signature preferences available for compose');
+            console.log('✅ Signature preferences loaded and applied');
             
             // Show a subtle notification that signature is available
             setTimeout(() => {
-                this.showNotification('📝 Your saved signature will be included', 'info');
-            }, 1000);
+                this.showNotification('📝 Signature loaded from your preferences', 'success');
+            }, 800);
         } else {
-            console.log('ℹ️ No signature preferences found for compose');
+            console.log('ℹ️ No signature preferences available');
+            
+            // Optionally show a hint about setting up signature
+            setTimeout(() => {
+                this.showNotification('💡 Tip: Set up your signature in RespondX settings for better emails!', 'info');
+            }, 1000);
         }
     } catch (error) {
-        console.error('Error loading signature preferences:', error);
+        console.error('💥 Error loading signature preferences:', error);
+        
+        // Show user-friendly error
+        setTimeout(() => {
+            this.showNotification('⚠️ Could not load signature preferences. They\'ll use defaults.', 'warning');
+        }, 800);
     }
     
     // Show voice input hint after modal opens
     setTimeout(() => {
         this.showVoiceHint();
-    }, 500);
+    }, 1200); // Delay a bit more to avoid conflicts with signature notification
 }
 
 
