@@ -1,23 +1,24 @@
 {
   "manifest_version": 3,
   "name": "RespondX",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Generate smart email replies and thread summaries with AI. Boost productivity with Gmail's next-gen communication.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "clipboardWrite"],
   "host_permissions": [
     "https://mail.google.com/*",
     "https://gmail-llm-based-auto-reply.vercel.app/*",
     "https://gmail-llm-based-auto-reply.onrender.com/*"
   ],
   "icons": {
-    "16": "icon2.png",
-    "48": "icon2.png",
-    "128": "icon2.png"
+    "16": "icon3.png",
+    "48": "icon3.png",
+    "128": "icon3.png"
   },
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["content.js"],
+      "js": ["content.js", "content-compose.js"],
+      "css": ["compose-styles.css"],
       "run_at": "document_idle"
     }
   ],

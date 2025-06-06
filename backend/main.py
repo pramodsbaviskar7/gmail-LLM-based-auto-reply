@@ -380,7 +380,7 @@ EMAIL_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    "model": "llama3-8b-8192",
+    "model": "llama-3.3-70b-versatile",
     "temperature": 0.7,
     "max_tokens": 500
 }
@@ -656,6 +656,549 @@ async def make_groq_request(payload: dict, max_retries: int = 3) -> dict:
     
     raise HTTPException(status_code=503, detail="Service unavailable after all retries")
 
+# Add these imports to your existing main.py file (after your existing imports)
+from enum import Enum
+from typing import List, Optional
+
+# Add these Pydantic models after your existing models (after ThreadAnalysisRequest)
+
+class ToneEnum(str, Enum):
+    professional = "professional"
+    friendly = "friendly"
+    formal = "formal"
+    casual = "casual"
+    concise = "concise"
+    enthusiastic = "enthusiastic"
+    neutral = "neutral"
+
+class LengthEnum(str, Enum):
+    brief = "brief"          # 2-3 sentences
+    short = "short"          # 1 paragraph
+    medium = "medium"        # 2-3 paragraphs
+    detailed = "detailed"    # 4+ paragraphs
+
+class LanguageEnum(str, Enum):
+    english = "english"
+    spanish = "spanish"
+    french = "french"
+    german = "german"
+    italian = "italian"
+    portuguese = "portuguese"
+    chinese = "chinese"
+    japanese = "japanese"
+    hindi = "hindi"
+
+class ResponseTypeEnum(str, Enum):
+    general = "general"
+    accept = "accept"
+    decline = "decline"
+    request = "request"
+    reschedule = "reschedule"
+    followup = "followup"
+    thank = "thank"
+    apology = "apology"
+
+class GreetingStyleEnum(str, Enum):
+    default = "default"
+    firstname = "firstname"
+    formal = "formal"
+    team = "team"
+    time = "time"
+
+class VoiceEnum(str, Enum):
+    first = "first"    # I/We
+    second = "second"  # You
+    third = "third"    # Third person
+
+class ComplexityEnum(str, Enum):
+    simple = "simple"
+    standard = "standard"
+    technical = "technical"
+    business = "business"
+
+class StructureEnum(str, Enum):
+    standard = "standard"
+    bullets = "bullets"
+    numbered = "numbered"
+    sections = "sections"
+
+# 🔥 NEW: UserPreferences model to handle signature data
+class UserPreferences(BaseModel):
+    hasPreferences: bool = Field(default=False, description="Whether user has saved preferences")
+    email: Optional[str] = Field(None, description="User email")
+    full_name: Optional[str] = Field(None, description="User full name")
+    linkedin: Optional[str] = Field(None, description="User LinkedIn profile")
+    mobile: Optional[str] = Field(None, description="User mobile number")
+
+class ComposeRequest(BaseModel):
+    # Basic options - Required
+    prompt: str = Field(..., min_length=1, max_length=1000, description="What you want to write about")
+    
+    # Basic options - Optional with defaults
+    tone: ToneEnum = Field(default=ToneEnum.professional, description="Email tone")
+    length: LengthEnum = Field(default=LengthEnum.medium, description="Email length")
+    language: LanguageEnum = Field(default=LanguageEnum.english, description="Email language")
+    responseType: ResponseTypeEnum = Field(default=ResponseTypeEnum.general, description="Type of response")
+    recipientContext: Optional[str] = Field(None, max_length=200, description="Who you're writing to")
+    
+    # Checkboxes
+    includeGreeting: bool = Field(default=True, description="Include greeting")
+    includeClosing: bool = Field(default=True, description="Include closing")
+    includeSignature: bool = Field(default=True, description="Include signature")
+    useEmojis: bool = Field(default=False, description="Use emojis")
+    
+    # Advanced options
+    greetingStyle: GreetingStyleEnum = Field(default=GreetingStyleEnum.default, description="Greeting style")
+    voice: VoiceEnum = Field(default=VoiceEnum.first, description="Voice perspective")
+    complexity: ComplexityEnum = Field(default=ComplexityEnum.standard, description="Language complexity")
+    structure: StructureEnum = Field(default=StructureEnum.standard, description="Content structure")
+    
+    # Optional custom fields
+    subjectLine: Optional[str] = Field(None, max_length=200, description="Custom subject line")
+    openingSentence: Optional[str] = Field(None, max_length=300, description="Custom opening")
+    closingLine: Optional[str] = Field(None, max_length=300, description="Custom closing")
+    
+    # Advanced checkboxes
+    includeThreadSummary: bool = Field(default=False, description="Include thread summary")
+    referencePastMessages: bool = Field(default=False, description="Reference past messages")
+    autoInsert: bool = Field(default=False, description="Auto-insert into Gmail")
+    
+    # 🔥 NEW: User preferences from frontend
+    userPreferences: Optional[UserPreferences] = Field(None, description="User signature preferences")
+    
+    # Form tracking (these are optional and won't break if missing)
+    formStateId: Optional[float] = Field(None, description="Form state ID")
+    timestamp: Optional[int] = Field(None, description="Timestamp")
+    
+    @validator('prompt')
+    def validate_prompt(cls, v):
+        if not v.strip():
+            raise ValueError('Prompt cannot be empty')
+        return v.strip()
+
+class ComposeResponse(BaseModel):
+    subject: str = Field(..., description="Generated email subject")
+    body: str = Field(..., description="Generated email body")
+    cached: bool = Field(..., description="Whether response was cached")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+def build_compose_prompt(compose_request: ComposeRequest, user_info: dict) -> str:
+    """
+    Build a comprehensive system prompt for email composition with proper formatting
+    Now includes dynamic signature handling based on user preferences
+    """
+    
+    # Check if we have real user preferences
+    has_user_preferences = (
+        compose_request.userPreferences and 
+        compose_request.userPreferences.hasPreferences
+    )
+    
+    # MANDATORY FORMATTING INSTRUCTIONS - Always at the top
+    formatting_instructions = """
+MANDATORY FORMATTING REQUIREMENTS:
+- ALWAYS start your response with "Subject: [your subject line]" 
+- Use proper line breaks (\\n) between sections
+- Never write emails as a single paragraph or single line
+- Always separate greeting, body, closing, and signature with line breaks
+- Each paragraph should be on its own line
+- Add blank lines between major sections
+
+EXACT FORMAT STRUCTURE REQUIRED:
+Subject: [Compelling and specific subject line based on email content]
+
+[Greeting],
+
+[Body paragraph 1]
+
+[Body paragraph 2 if needed]
+
+[Closing],
+[Signature]
+
+FORMATTING EXAMPLES:
+
+SHORT EMAIL EXAMPLE:
+Subject: Quick Reminder: Friday Deadline
+
+Hello,
+
+I wanted to remind you about our product launch deadline next Friday. Please send your status update by end of week.
+
+Best regards,
+Your Name
+
+MEDIUM EMAIL EXAMPLE:
+Subject: Reminder: Product Launch Deadline and Status Updates
+
+Hello,
+
+I hope this email finds you well.
+
+I wanted to remind you about our upcoming product launch deadline, which is set for next Friday. As we approach this important milestone, I would appreciate if each team member could provide a quick status update on their assigned tasks.
+
+Please send your updates by the end of this week so we can ensure everything stays on track.
+
+Best regards,
+Your Name
+"""
+    
+    # Length-specific guidelines
+    length_guidelines = {
+        "brief": """
+LENGTH: BRIEF (50-100 words total)
+- Use exactly 1-2 body paragraphs
+- Maximum 2 sentences per paragraph
+- Keep it concise but properly formatted with line breaks
+- Structure: Subject → Greeting → Body (1-2 paragraphs) → Closing → Signature
+""",
+        "short": """
+LENGTH: SHORT (75-150 words total)
+- Use exactly 1-2 body paragraphs
+- Maximum 2-3 sentences per paragraph
+- Keep it concise but properly formatted with line breaks
+- Structure: Subject → Greeting → Body (1-2 paragraphs) → Closing → Signature
+""",
+        "medium": """
+LENGTH: MEDIUM (150-250 words total)
+- Use exactly 2-3 body paragraphs
+- 2-3 sentences per paragraph
+- Balanced detail with proper paragraph separation
+- Structure: Subject → Greeting → Body (2-3 paragraphs) → Closing → Signature
+""",
+        "detailed": """
+LENGTH: DETAILED (250+ words total)
+- Use exactly 3-4 body paragraphs
+- 3-4 sentences per paragraph
+- Comprehensive content with clear paragraph structure
+- Structure: Subject → Greeting → Body (3-4 paragraphs) → Closing → Signature
+"""
+    }
+    
+    # Tone guidelines
+    tone_guidelines = {
+        "professional": "Use formal business language, polite and respectful tone",
+        "friendly": "Use warm, approachable language while maintaining professionalism",
+        "casual": "Use relaxed, conversational tone but still appropriate for email",
+        "formal": "Use very formal, traditional business language and structure",
+        "concise": "Use brief, direct language while remaining professional",
+        "enthusiastic": "Use energetic, positive language while maintaining professionalism",
+        "neutral": "Use balanced, objective language without strong emotional tone"
+    }
+    
+    # Get specific guidelines
+    length_instruction = length_guidelines.get(compose_request.length, length_guidelines["medium"])
+    tone_instruction = tone_guidelines.get(compose_request.tone, "professional")
+    
+    # Build sections based on user preferences
+    greeting_instruction = "Include appropriate greeting" if compose_request.includeGreeting else "Skip greeting and start with main content"
+    closing_instruction = "Include appropriate closing" if compose_request.includeClosing else "Skip closing"
+    
+    # 🔥 NEW: Dynamic signature instruction based on preferences
+    if compose_request.includeSignature:
+        if has_user_preferences:
+            # Use real user data
+            user_prefs = compose_request.userPreferences
+            signature_parts = []
+            
+            if user_prefs.full_name:
+                signature_parts.append(f"{user_prefs.full_name}")
+            if user_prefs.email:
+                signature_parts.append(f"{user_prefs.email}")
+            if user_prefs.linkedin:
+                signature_parts.append(f"{user_prefs.linkedin}")
+            if user_prefs.mobile:
+                signature_parts.append(f"{user_prefs.mobile}")
+            
+            if signature_parts:
+                signature_instruction = f"Include signature with the following EXACT information (each on a new line):\n{chr(10).join(signature_parts)}"
+            else:
+                signature_instruction = f"Include signature with: {user_info['full_name']}, {user_info['email']}, {user_info['linkedin']}, {user_info['mobile']}"
+        else:
+            # Use template data
+            signature_instruction = f"Include signature with: {user_info['full_name']}, {user_info['email']}, {user_info['linkedin']}, {user_info['mobile']}"
+    else:
+        signature_instruction = "Skip signature"
+    
+    emoji_instruction = "Include appropriate emojis throughout the email" if compose_request.useEmojis else "Do not use any emojis"
+    
+    # Build the complete system prompt
+    system_prompt = f"""
+You are a professional email composer. Your task is to write well-formatted emails that follow proper structure and formatting.
+
+{formatting_instructions}
+
+EMAIL REQUIREMENTS:
+{length_instruction}
+
+TONE & STYLE:
+- Tone: {compose_request.tone} - {tone_instruction}
+- Language: {compose_request.language}
+- IMPORTANT: Always write the email in English, even if the user input contains Hinglish or mixed languages, unless the user specifically requests to write in Hindi
+- Voice: {compose_request.voice} person
+- Complexity: {compose_request.complexity}
+
+CONTENT REQUIREMENTS:
+- {greeting_instruction}
+- {closing_instruction}
+- {signature_instruction}
+- {emoji_instruction}
+
+CUSTOM ELEMENTS:
+- Subject Line: {compose_request.subjectLine if compose_request.subjectLine else "Generate appropriate subject"}
+- Opening: {compose_request.openingSentence if compose_request.openingSentence else "Use natural opening"}
+- Closing: {compose_request.closingLine if compose_request.closingLine else "Use appropriate closing"}
+
+SIGNATURE INFORMATION:
+{'- Using REAL user preferences from saved settings' if has_user_preferences else '- Using template signature information'}
+
+CRITICAL REMINDERS:
+1. ALWAYS start with "Subject: [your subject line]" on the first line
+2. NEVER write the email as a single paragraph or single line
+3. ALWAYS use line breaks between paragraphs
+4. ALWAYS separate greeting, body, closing, and signature
+5. Follow the exact format structure shown in examples above
+6. Each paragraph must be on its own line with blank lines between sections
+{'7. Use the EXACT signature information provided above' if has_user_preferences else '7. Use appropriate signature format'}
+
+Write a properly formatted email that follows all these requirements.
+"""
+    
+    return system_prompt
+
+# Helper function to generate subject line
+def generate_subject_line(prompt: str, response_type: str, custom_subject: Optional[str] = None) -> str:
+    """Generate an appropriate subject line"""
+    
+    if custom_subject:
+        return custom_subject.strip()
+    
+    # Simple subject line generation based on prompt and type
+    subject_templates = {
+        "accept": "Re: Acceptance Confirmation",
+        "decline": "Re: Unable to Proceed",
+        "request": "Request for Information",
+        "reschedule": "Rescheduling Request", 
+        "followup": "Follow-up",
+        "thank": "Thank You",
+        "apology": "Apology",
+        "general": "Response"
+    }
+    
+    # Try to extract key terms from prompt for better subjects
+    prompt_lower = prompt.lower()
+    if "meeting" in prompt_lower:
+        return f"Re: Meeting {subject_templates.get(response_type, 'Discussion')}"
+    elif "project" in prompt_lower:
+        return f"Re: Project {subject_templates.get(response_type, 'Update')}"
+    elif "proposal" in prompt_lower:
+        return f"Re: Proposal {subject_templates.get(response_type, 'Response')}"
+    elif "interview" in prompt_lower:
+        return f"Re: Interview {subject_templates.get(response_type, 'Follow-up')}"
+    
+    return subject_templates.get(response_type, "Response")
+
+# Add this endpoint to your FastAPI app (add after your existing endpoints)
+
+import re
+
+def extract_subject_from_email(email_content: str) -> tuple[str, str]:
+    """
+    Extract subject line from AI-generated email content and return clean body.
+    
+    Args:
+        email_content: The full email content from AI
+        
+    Returns:
+        tuple: (extracted_subject, clean_body)
+    """
+    
+    # Pattern to match "Subject: ..." at the beginning
+    subject_pattern = r'^Subject:\s*(.+?)(?:\n|$)'
+    
+    # Try to find subject in the email content
+    subject_match = re.search(subject_pattern, email_content.strip(), re.IGNORECASE | re.MULTILINE)
+    
+    if subject_match:
+        # Extract the subject
+        extracted_subject = subject_match.group(1).strip()
+        
+        # Remove the subject line from the body
+        clean_body = re.sub(subject_pattern, '', email_content.strip(), flags=re.IGNORECASE | re.MULTILINE).strip()
+        
+        print(f"📧 Extracted subject from AI: '{extracted_subject}'")
+        return extracted_subject, clean_body
+    
+    # If no subject found in content, return None and original body
+    print("📧 No subject found in AI content")
+    return None, email_content.strip()
+
+@app.post("/api/compose", response_model=ComposeResponse)
+@limiter.limit("50/minute")  # Adjust rate limit as needed
+async def compose_email(
+    request: Request, 
+    compose_request: ComposeRequest, 
+    background_tasks: BackgroundTasks
+):
+    """
+    Generate a complete email based on user requirements.
+    Now supports user preferences from auto-reply system for signatures.
+    """
+    try:
+        # Sanitize input
+        prompt_text = sanitize_input(compose_request.prompt)
+        
+        # DEBUG: Log the parameters we're receiving
+        print(f"🎯 useEmojis: {compose_request.useEmojis}")
+        print(f"🎯 tone: {compose_request.tone}")
+        print(f"🎯 includeGreeting: {compose_request.includeGreeting}")
+        print(f"🎯 includeClosing: {compose_request.includeClosing}")
+        print(f"🎯 includeSignature: {compose_request.includeSignature}")
+        print(f"🎯 userPreferences: {compose_request.userPreferences}")
+        
+        # 🔥 NEW: Determine user info based on preferences
+        if compose_request.userPreferences and compose_request.userPreferences.hasPreferences:
+            # Use the actual user preferences from auto-reply system
+            selected_user_info = {
+                "full_name": compose_request.userPreferences.full_name or "Your Name",
+                "email": compose_request.userPreferences.email or "your.email@company.com",
+                "linkedin": compose_request.userPreferences.linkedin or "https://www.linkedin.com/in/yourprofile",
+                "mobile": compose_request.userPreferences.mobile or "+1 (555) 123-4567"
+            }
+            print(f"✅ Using saved user preferences: {selected_user_info}")
+        else:
+            # Fallback logic (same as before)
+            user_identity = compose_request.recipientContext or ""
+            if "pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity:
+                selected_user_info = USER_INFO
+            else:
+                selected_user_info = {
+                    "full_name": "Your Name",
+                    "email": "your.email@company.com",
+                    "linkedin": "https://www.linkedin.com/in/yourprofile",
+                    "mobile": "+1 (555) 123-4567"
+                }
+            print(f"📝 Using fallback user info: {selected_user_info}")
+        
+        # Build the system prompt with the determined user info
+        system_prompt = build_compose_prompt(compose_request, selected_user_info)
+        
+        # DEBUG: Log the system prompt to see if parameters are being used
+        print(f"📝 System prompt snippet: {system_prompt[:200]}...")
+        
+        # Create user message
+        user_message = f"Write an email about: {prompt_text}"
+        if compose_request.recipientContext:
+            user_message += f"\nRecipient: {compose_request.recipientContext}"
+        
+        # Prepare API request
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+        
+        payload = {
+            "messages": messages,
+            "model": MODEL_CONFIG['model'],
+            "temperature": MODEL_CONFIG['temperature'], 
+            "max_tokens": MODEL_CONFIG['max_tokens']
+        }
+        
+        # Make API request
+        result = await make_groq_request(payload)
+        
+        if "choices" not in result or len(result["choices"]) == 0:
+            raise HTTPException(status_code=500, detail="Invalid API response")
+        
+        # 🔥 GET RAW AI RESPONSE
+        raw_email_content = result["choices"][0]["message"]["content"].strip()
+        print(f"🤖 Raw AI response: {raw_email_content[:200]}...")
+        
+        # 🔥 EXTRACT SUBJECT FROM AI RESPONSE
+        extracted_subject, clean_email_body = extract_subject_from_email(raw_email_content)
+        
+        # 🔥 USE EXTRACTED SUBJECT OR FALLBACK
+        if extracted_subject:
+            final_subject = extracted_subject
+            print(f"✅ Using AI-extracted subject: '{final_subject}'")
+        else:
+            # Fallback to old method if extraction fails
+            final_subject = generate_subject_line(
+                prompt_text, 
+                compose_request.responseType,
+                compose_request.subjectLine
+            )
+            clean_email_body = raw_email_content  # Use original content if no subject extracted
+            print(f"🔄 Using fallback subject: '{final_subject}'")
+        
+        print("final_subject:", final_subject)
+        print("final_email_body length:", len(clean_email_body))
+        
+        # Prepare response
+        response_data = {
+            "subject": final_subject,  # 🔥 NOW USES AI-EXTRACTED SUBJECT
+            "body": clean_email_body,  # 🔥 CLEAN BODY WITH PROPER SIGNATURE
+            "cached": False,  # Always false now since no caching
+            "metadata": {
+                "tone": compose_request.tone,
+                "length": compose_request.length,
+                "language": compose_request.language,
+                "subjectSource": "ai_extracted" if extracted_subject else "fallback",
+                "signatureSource": "user_preferences" if (compose_request.userPreferences and compose_request.userPreferences.hasPreferences) else "template",
+                "word_count": len(clean_email_body.split()),
+                "character_count": len(clean_email_body),
+                "hasUserPreferences": bool(compose_request.userPreferences and compose_request.userPreferences.hasPreferences)
+            }
+        }
+        
+        logger.info(f"Generated email successfully - Subject: {final_subject}, Body length: {len(clean_email_body)}")
+        print(f"✅ Generated email with signature preferences")
+        
+        return ComposeResponse(**response_data)
+        
+    except GroqAPIError as e:
+        logger.error(f"Groq API error in compose: {e}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in compose: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/compose/templates")
+async def get_email_templates():
+    """Get available email templates"""
+    templates = {
+        "meeting-request": {
+            "name": "Meeting Request",
+            "description": "Request a meeting with someone",
+            "prompt": "Write an email requesting a meeting to discuss the upcoming project timeline and deliverables. Suggest a few time slots for next week.",
+            "suggested_tone": "professional",
+            "suggested_length": "medium"
+        },
+        "follow-up": {
+            "name": "Follow-up Email", 
+            "description": "Follow up on a previous conversation",
+            "prompt": "Write a follow-up email checking on the status of our previous discussion and offering additional assistance if needed.",
+            "suggested_tone": "friendly",
+            "suggested_length": "short"
+        },
+        "thank-you": {
+            "name": "Thank You",
+            "description": "Express gratitude",
+            "prompt": "Write a thank you email expressing appreciation for their time and assistance with the recent project.",
+            "suggested_tone": "friendly",
+            "suggested_length": "brief"
+        },
+        "introduction": {
+            "name": "Introduction Email",
+            "description": "Introduce yourself or make a connection",
+            "prompt": "Write a professional introduction email introducing myself and explaining how I can help with their business needs.",
+            "suggested_tone": "professional", 
+            "suggested_length": "medium"
+        }
+    }
+    
+    return {"templates": templates}
+
 @app.post("/generate")
 async def generate_reply(request: Request, prompt_request: PromptRequest, background_tasks: BackgroundTasks):
     try:
@@ -835,10 +1378,15 @@ Your output must:
 - Begin directly with '{' and end with '}'.
 - Contain **no extra characters** outside the JSON.
 - Include **no explanations**, **no headings**, and **no markdown formatting**.
-- Exclude notes like "Here is your JSON", "Here’s the result:", "```json", or trailing dots (...).
+- Exclude notes like "Here is your JSON", "Here's the result:", "```json", or trailing dots (...).
 
 Instructions:
-1. Generate a detailed summary that captures the entire conversation flow, including sender intentions, replies, tone, and outcomes. Include who said what, how the message was received, and the final result. The summary should be at least 5–7 sentences long.
+1. Generate a **concise, focused summary** (2-3 sentences maximum) that captures:
+   - The main purpose/request of the thread
+   - Key decision or outcome (if any)
+   - Current status or next steps
+   Keep it brief and actionable - focus on WHAT was discussed and WHAT needs to happen next.
+
 2. Perform "sentiment_analysis" of the thread (e.g., positive, negative, neutral), and highlight tone shifts if any.
 3. Perform "topic modeling" to extract main topics and subtopics.
 4. Extract all "named_entities", including:
@@ -907,7 +1455,7 @@ Do not include any additional content.
     except Exception as e:
         logger.error(f"Analysis error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-
+    
 @app.head("/health")
 @app.get("/health")
 async def health_check():

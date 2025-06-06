@@ -1,0 +1,495 @@
+/* compose-styles.css - Add this to your extension's CSS */
+
+/* Compose button in Gmail toolbar */
+.compose-ai-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.compose-ai-btn:hover {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #5a67d8 0%, #68419b 100%) !important;
+    transform: translateY(-1px) !important;
+}
+
+.compose-ai-btn svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+}
+
+/* Modal overlay */
+.compose-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.compose-modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Modal container */
+.compose-modal {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.compose-modal-overlay.active .compose-modal {
+    transform: scale(1);
+}
+
+/* Modal header */
+.compose-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.compose-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.compose-header .sparkle {
+    color: #667eea;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.close-button:hover {
+    background: #f3f4f6;
+}
+
+.close-button svg {
+    width: 20px;
+    height: 20px;
+    stroke: #6b7280;
+}
+
+/* Modal body */
+.compose-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Form elements */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.form-label .required {
+    color: #ef4444;
+}
+
+.prompt-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.prompt-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.char-count {
+    text-align: right;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* Options grid */
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.select-wrapper {
+    position: relative;
+}
+
+.form-select {
+    width: 100%;
+    padding: 10px 36px 10px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    appearance: none;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #6b7280;
+    pointer-events: none;
+}
+
+/* Advanced options */
+.advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    color: #374151;
+}
+
+.advanced-toggle input {
+    cursor: pointer;
+}
+
+.advanced-options {
+    background: #f9fafb;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.advanced-options.show {
+    display: block;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #374151;
+}
+
+.checkbox-label input {
+    cursor: pointer;
+}
+
+/* Generate button */
+.generate-button {
+    width: 100%;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.generate-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.generate-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Loading state */
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+}
+
+.generate-button.loading .loading-spinner {
+    display: block;
+}
+
+.generate-button.loading .button-text {
+    display: none;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Result section */
+.result-section {
+    display: none;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.result-section.show {
+    display: block;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.result-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.result-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-button {
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    background: white;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #374151;
+}
+
+.action-button:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.action-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.action-button.primary {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.action-button.primary:hover {
+    background: #5a67d8;
+}
+
+/* Email preview */
+.email-preview {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.email-subject {
+    font-weight: 600;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #1f2937;
+}
+
+.email-body {
+    white-space: pre-wrap;
+    color: #374151;
+    line-height: 1.6;
+}
+
+/* Success message */
+.success-message {
+    display: none;
+    padding: 12px 16px;
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    border-radius: 8px;
+    color: #065f46;
+    font-size: 14px;
+    margin-top: 16px;
+    align-items: center;
+    gap: 8px;
+}
+
+.success-message.show {
+    display: flex;
+}
+
+.success-message svg {
+    width: 16px;
+    height: 16px;
+    stroke: #065f46;
+}
+
+/* Error message */
+.error-message {
+    display: none;
+    padding: 12px 16px;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    color: #991b1b;
+    font-size: 14px;
+    margin-top: 16px;
+}
+
+.error-message.show {
+    display: block;
+}
+
+/* Dark mode support (if Gmail is in dark mode) */
+@media (prefers-color-scheme: dark) {
+    .compose-modal {
+        background: #1f2937;
+        color: #f3f4f6;
+    }
+    
+    .compose-header {
+        border-bottom-color: #374151;
+    }
+    
+    .compose-header h2 {
+        color: #f3f4f6;
+    }
+    
+    .close-button:hover {
+        background: #374151;
+    }
+    
+    .close-button svg {
+        stroke: #9ca3af;
+    }
+    
+    .form-label {
+        color: #e5e7eb;
+    }
+    
+    .prompt-textarea,
+    .form-select {
+        background: #374151;
+        border-color: #4b5563;
+        color: #f3f4f6;
+    }
+    
+    .prompt-textarea:focus,
+    .form-select:focus {
+        border-color: #667eea;
+    }
+    
+    .advanced-options {
+        background: #374151;
+    }
+    
+    .email-preview {
+        background: #374151;
+        border-color: #4b5563;
+    }
+    
+    .email-subject {
+        color: #f3f4f6;
+        border-bottom-color: #4b5563;
+    }
+    
+    .email-body {
+        color: #e5e7eb;
+    }
+    
+    .action-button {
+        background: #374151;
+        border-color: #4b5563;
+        color: #e5e7eb;
+    }
+    
+    .action-button:hover {
+        background: #4b5563;
+        border-color: #6b7280;
+    }
+}
