@@ -1198,47 +1198,6 @@ async def get_email_templates():
     
     return {"templates": templates}
 
-# Health check update to include compose endpoint
-@app.get("/api/compose/health")
-async def compose_health_check():
-    """Health check specifically for compose functionality"""
-    try:
-        # Test with minimal compose request
-        test_request = ComposeRequest(
-            prompt="test email",
-            tone=ToneEnum.professional,
-            length=LengthEnum.brief,
-            includeSignature=False
-        )
-        
-        # Just validate the request model
-        cache_key = get_cache_key({"test": "compose_health"})
-        
-        return {
-            "status": "healthy",
-            "endpoint": "/api/compose",
-            "features": [
-                "email_composition",
-                "multi_language_support", 
-                "tone_adjustment",
-                "length_control",
-                "template_support"
-            ],
-            "supported_languages": [lang.value for lang in LanguageEnum],
-            "supported_tones": [tone.value for tone in ToneEnum],
-            "cache_status": "operational"
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "unhealthy",
-                "endpoint": "/api/compose", 
-                "error": str(e)
-            }
-        )
-
-
 @app.post("/generate")
 async def generate_reply(request: Request, prompt_request: PromptRequest, background_tasks: BackgroundTasks):
     try:
