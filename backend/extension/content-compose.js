@@ -7,7 +7,8 @@ class GmailComposeFeature {
         this.composeButton = null;
         this.initialized = false;
         this.darkMode = false;
-        this.API_URL = 'https://gmail-llm-based-auto-reply.vercel.app';
+        this.API_URL = 'https://gmail-llm-based-auto-reply.vercel.app'; 
+        this.BACKUP_API_URL = 'https://gmail-llm-based-auto-reply.onrender.com';
         // ADD THESE NEW LINES:
         this.recognition = null;
         this.isListening = false;
@@ -2713,19 +2714,76 @@ async handleGenerate(e) {
         const cacheKey = `${this.formStateId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;    
         const randomParam = Math.random().toString(36).substr(2, 15);
         
-        // Call API
-        const response = await fetch(`${this.API_URL}/api/compose?_t=${cacheKey}&_r=${randomParam}&_state=${this.formStateId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-Cache-Bust': cacheKey
-            },
-            body: JSON.stringify(formData)
-        });
+        // Call API with fallback and cool error handling
+        let response;
+        let usingBackup = false;
+
+        try {
+            // Show trying primary server message
+            this.showNotification('🚀 Connecting to AI servers...', 'info');
+            
+            response = await fetch(`${this.API_URL}/api/compose?_t=${cacheKey}&_r=${randomParam}&_state=${this.formStateId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Cache-Bust': cacheKey
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            // If response is not ok, throw error to trigger backup
+            if (!response.ok) {
+                throw new Error(`Primary server returned ${response.status}`);
+            }
+            
+        } catch (primaryError) {
+            console.warn('🔄 Primary API failed, trying backup...', primaryError);
+            
+            // Show cool backup message
+            this.showNotification('🔄 Primary server busy! Switching to backup AI...', 'warning');
+            usingBackup = true;
+            
+            try {
+                response = await fetch(`${this.BACKUP_API_URL}/api/compose?_t=${cacheKey}&_r=${randomParam}&_state=${this.formStateId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache', 
+                        'Expires': '0',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Cache-Bust': cacheKey
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Backup server returned ${response.status}`);
+                }
+                
+                // Success with backup
+                this.showNotification('✅ Backup AI to the rescue!', 'success');
+                
+            } catch (backupError) {
+                console.error('💥 Both APIs failed:', backupError);
+                
+                // Cool error messages for complete failure
+                let coolErrorMessage;
+                if (primaryError.message.includes('fetch') && backupError.message.includes('fetch')) {
+                    coolErrorMessage = '⚡ Our servers are taking a power nap. Please try again shortly!';
+                } else if (primaryError.message.includes('500') || backupError.message.includes('500')) {
+                    coolErrorMessage = '🤖 Both AI servers are having a coffee break! Please try again in a few moments.';
+                } else {
+                    coolErrorMessage = '⚡ Both primary and backup servers are taking a power nap. Please try again shortly!';
+                }
+                
+                throw new Error(coolErrorMessage);
+            }
+        }
         
         if (!response.ok) {
             let errorMessage = `API Error: ${response.status}`;
@@ -2760,7 +2818,7 @@ async handleGenerate(e) {
         resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         
         // Show success message with signature info
-        let successMessage = '✅ Email generated successfully!';
+        let successMessage = usingBackup ? '🎯 Email generated via backup server!' : '✅ Email generated successfully!';
         if (data.metadata?.hasUserPreferences) {
             successMessage += ' (with your signature)';
         }
@@ -2775,7 +2833,35 @@ async handleGenerate(e) {
         
     } catch (error) {
         console.error('💥 Error generating email:', error);
-        this.showNotification(`❌ Failed to generate email: ${error.message}`, 'error');
+        
+        // If it's our custom cool message, show it directly
+        if (error.message.includes('Houston') || error.message.includes('coffee break') || error.message.includes('power nap')) {
+            this.showNotification(error.message, 'error');
+        } else {
+            // Cool custom error messages based on error type
+            let customMessage;
+            let errorType = 'error';
+            
+            if (error.message.includes('500')) {
+                customMessage = '🤖 Our AI is having a coffee break! Please try again in a moment.';
+                errorType = 'warning';
+            } else if (error.message.includes('404')) {
+                customMessage = '🔍 Hmm, our AI got lost in cyberspace. Please try again!';
+            } else if (error.message.includes('403') || error.message.includes('401')) {
+                customMessage = '🔐 Authentication hiccup detected. Please refresh and try again.';
+            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                customMessage = '🌐 Network gremlins detected! Check your connection and try again.';
+            } else if (error.message.includes('timeout')) {
+                customMessage = '⏰ Server is thinking too hard! Please try again.';
+            } else if (error.message.includes('Rate limit')) {
+                customMessage = '🚦 Whoa there, speedy! Rate limit hit. Please wait a moment and try again.';
+            } else {
+                // Generic but cool fallback
+                customMessage = '🎭 Something mysterious happened! Please try again in a moment.';
+            }
+            
+            this.showNotification(customMessage, errorType);
+        }
         
     } finally {
         generateButton.classList.remove('loading');
@@ -2928,19 +3014,27 @@ insertEmailContent() {
     showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     
-    let backgroundColor;
+    let backgroundColor, borderLeft;
     switch(type) {
         case 'success':
-            backgroundColor = '#10b981';
+            backgroundColor = 'linear-gradient(135deg, #10b981, #059669)';
+            borderLeft = '4px solid #065f46';
             break;
         case 'error':
-            backgroundColor = '#ef4444';
+            backgroundColor = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            borderLeft = '4px solid #991b1b';
+            break;
+        case 'warning':
+            backgroundColor = 'linear-gradient(135deg, #f59e0b, #d97706)';
+            borderLeft = '4px solid #92400e';
             break;
         case 'info':
-            backgroundColor = '#3b82f6';
+            backgroundColor = 'linear-gradient(135deg, #3b82f6, #2563eb)';
+            borderLeft = '4px solid #1d4ed8';
             break;
         default:
-            backgroundColor = '#6b7280';
+            backgroundColor = 'linear-gradient(135deg, #6b7280, #4b5563)';
+            borderLeft = '4px solid #374151';
     }
     
     notification.style.cssText = `
@@ -2948,14 +3042,19 @@ insertEmailContent() {
         bottom: 20px;
         left: 50%;
         transform: translateX(-50%);
-        padding: 12px 24px;
+        padding: 16px 24px;
         background: ${backgroundColor};
+        border-left: ${borderLeft};
         color: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         z-index: 10000;
-        animation: slideUp 0.3s ease;
+        animation: slideUpBounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         font-weight: 500;
+        font-size: 14px;
+        max-width: 400px;
+        text-align: center;
+        backdrop-filter: blur(10px);
     `;
     notification.textContent = message;
     
@@ -2963,8 +3062,9 @@ insertEmailContent() {
     
     setTimeout(() => {
         notification.remove();
-    }, 3000);
+    }, 5000);
 }
+
 trackFormChanges() {
     // Track when any form element changes to help with debugging
     const formElements = [
@@ -3027,7 +3127,26 @@ animationStyle.textContent = `
             opacity: 1;
         }
     }
+    
+    @keyframes slideUpBounce {
+        0% {
+            transform: translate(-50%, 100%);
+            opacity: 0;
+            scale: 0.8;
+        }
+        50% {
+            transform: translate(-50%, -10px);
+            opacity: 0.8;
+            scale: 1.05;
+        }
+        100% {
+            transform: translate(-50%, 0);
+            opacity: 1;
+            scale: 1;
+        }
+    }
 `;
+
 document.head.appendChild(animationStyle);
 
 // Initialize

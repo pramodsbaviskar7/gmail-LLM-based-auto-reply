@@ -1459,39 +1459,44 @@ Do not include any additional content.
 @app.head("/health")
 @app.get("/health")
 async def health_check():
+    """Health check endpoint without external API calls"""
     try:
-        # Test Groq API with minimal request
-        test_payload = {
-            "messages": [{"role": "user", "content": "test"}],
-            "model": MODEL_CONFIG["model"],
-            "max_tokens": 1
-        }
-        
-        start_time = time.time()
-        await make_groq_request(test_payload)
-        api_latency = time.time() - start_time
-        
         cache_stats = response_cache.stats()
         circuit_stats = groq_circuit_breaker.get_stats()
         
-        return {
+        # Simple internal health checks
+        health_status = {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
-            "api_latency_ms": round(api_latency * 1000, 2),
             "cache": cache_stats,
             "circuit_breaker": circuit_stats,
-            "version": "2.0.0"
+            "version": "2.0.0",
+            "system": {
+                "cache_size": response_cache.size(),
+                "concurrent_requests_available": concurrent_requests._value,
+                "max_concurrent_requests": config["MAX_CONCURRENT_REQUESTS"]
+            }
         }
+        
+        # Check if circuit breaker is open (indicates issues)
+        if circuit_stats["state"] == "OPEN":
+            health_status["status"] = "degraded"
+            health_status["warning"] = "Circuit breaker is open - external API issues detected"
+        
+        return health_status
+        
     except Exception as e:
+        logger.error(f"Health check error: {e}")
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "version": "2.0.0"
             }
         )
-
+    
 @app.get("/metrics")
 async def get_metrics():
     return {
