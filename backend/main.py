@@ -785,7 +785,7 @@ class ComposeResponse(BaseModel):
 def build_compose_prompt(compose_request: ComposeRequest, user_info: dict) -> str:
     """
     Build a comprehensive system prompt for email composition with proper formatting
-    Now includes dynamic signature handling based on user preferences
+    Now includes dynamic signature handling based on user preferences AND proper structure formatting
     """
     
     # Check if we have real user preferences
@@ -794,8 +794,69 @@ def build_compose_prompt(compose_request: ComposeRequest, user_info: dict) -> st
         compose_request.userPreferences.hasPreferences
     )
     
+    # 🔥 IMPROVED: Add structure-specific formatting instructions
+    structure_instructions = {
+        "standard": """
+STRUCTURE: STANDARD
+- Use natural paragraph flow
+- Organize content logically without special formatting
+- Keep paragraphs well-separated with line breaks
+""",
+        "bullets": """
+STRUCTURE: BULLET POINTS (MANDATORY)
+- Use bullet points (•) for all lists and key points
+- Format action items as: • [Task description] - Assigned to [Person] - Due: [Date]
+- Use bullets for any enumerated content
+- Example format:
+  
+Key Points:
+• First important point
+• Second important point
+• Third important point
+
+Action Items:
+• Complete project plan - Assigned to John - Due: Friday
+• Review budget proposal - Assigned to Sarah - Due: Monday
+""",
+        "numbered": """
+STRUCTURE: NUMBERED LISTS (MANDATORY)
+- Use numbered lists (1., 2., 3.) for all organized content
+- Format action items as: 1. [Task description] - Assigned to [Person] - Due: [Date]
+- Use numbers for any enumerated content
+- Example format:
+
+Key Points:
+1. First important point
+2. Second important point  
+3. Third important point
+
+Action Items:
+1. Complete project plan - Assigned to John - Due: Friday
+2. Review budget proposal - Assigned to Sarah - Due: Monday
+3. Schedule follow-up meeting - Assigned to Michael - Due: Wednesday
+""",
+        "sections": """
+STRUCTURE: CLEAR SECTIONS (MANDATORY)
+- Use bold section headers followed by content
+- Organize content under clear headings
+- Example format:
+
+**Project Overview:**
+[Content about the project]
+
+**Key Decisions:**
+[Content about decisions made]
+
+**Next Steps:**
+[Content about upcoming actions]
+"""
+    }
+    
+    # Get structure instruction
+    structure_instruction = structure_instructions.get(compose_request.structure, structure_instructions["standard"])
+    
     # MANDATORY FORMATTING INSTRUCTIONS - Always at the top
-    formatting_instructions = """
+    formatting_instructions = f"""
 MANDATORY FORMATTING REQUIREMENTS:
 - ALWAYS start your response with "Subject: [your subject line]" 
 - Use proper line breaks (\\n) between sections
@@ -803,6 +864,8 @@ MANDATORY FORMATTING REQUIREMENTS:
 - Always separate greeting, body, closing, and signature with line breaks
 - Each paragraph should be on its own line
 - Add blank lines between major sections
+
+{structure_instruction}
 
 EXACT FORMAT STRUCTURE REQUIRED:
 Subject: [Compelling and specific subject line based on email content]
@@ -828,16 +891,25 @@ I wanted to remind you about our product launch deadline next Friday. Please sen
 Best regards,
 Your Name
 
-MEDIUM EMAIL EXAMPLE:
-Subject: Reminder: Product Launch Deadline and Status Updates
+MEDIUM EMAIL EXAMPLE WITH NUMBERED STRUCTURE:
+Subject: Follow-up: Action Items from Today's Meeting
 
 Hello,
 
 I hope this email finds you well.
 
-I wanted to remind you about our upcoming product launch deadline, which is set for next Friday. As we approach this important milestone, I would appreciate if each team member could provide a quick status update on their assigned tasks.
+Thank you for attending today's productive meeting. Here are the key points we discussed:
 
-Please send your updates by the end of this week so we can ensure everything stays on track.
+1. Project timeline review and milestone adjustments
+2. Budget allocation for the upcoming quarter
+3. Resource requirements and team capacity planning
+
+Action Items:
+1. Finalize project scope document - Assigned to Team Lead - Due: Friday
+2. Prepare budget proposal presentation - Assigned to Finance Team - Due: Monday
+3. Conduct resource availability assessment - Assigned to HR Department - Due: Wednesday
+
+Please review these action items and confirm your availability to complete them by the specified deadlines.
 
 Best regards,
 Your Name
@@ -944,6 +1016,11 @@ CONTENT REQUIREMENTS:
 - {signature_instruction}
 - {emoji_instruction}
 
+STRUCTURE REQUIREMENT (CRITICAL):
+- Structure type: {compose_request.structure}
+- YOU MUST follow the {compose_request.structure.upper()} structure guidelines shown above
+- This is MANDATORY - do not ignore structure formatting requirements
+
 CUSTOM ELEMENTS:
 - Subject Line: {compose_request.subjectLine if compose_request.subjectLine else "Generate appropriate subject"}
 - Opening: {compose_request.openingSentence if compose_request.openingSentence else "Use natural opening"}
@@ -959,9 +1036,10 @@ CRITICAL REMINDERS:
 4. ALWAYS separate greeting, body, closing, and signature
 5. Follow the exact format structure shown in examples above
 6. Each paragraph must be on its own line with blank lines between sections
-{'7. Use the EXACT signature information provided above' if has_user_preferences else '7. Use appropriate signature format'}
+7. MANDATORY: Apply the {compose_request.structure.upper()} structure formatting as specified
+{'8. Use the EXACT signature information provided above' if has_user_preferences else '8. Use appropriate signature format'}
 
-Write a properly formatted email that follows all these requirements.
+Write a properly formatted email that follows all these requirements, especially the {compose_request.structure.upper()} structure formatting.
 """
     
     return system_prompt
