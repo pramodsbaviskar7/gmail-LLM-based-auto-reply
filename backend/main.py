@@ -1260,7 +1260,15 @@ async def compose_email(
         
         print("final_subject:", final_subject)
         print("final_email_body length:", len(clean_email_body))
-        
+        # Add marketing disclaimer
+        note = (
+    "\n\n___________________________________________________________________________________________________________________\n"
+    "NOTE: This Email is Generated using RespondX AI Assistant — "
+    "Get it here: https://chromewebstore.google.com/detail/mjehcgcmiehakjkcegdanjlnkilaliml"
+    "\nDeveloped by Pramod Baviskar"
+)        
+        clean_email_body = clean_email_body + note
+
         # Prepare response
         response_data = {
             "subject": final_subject,  # 🔥 NOW USES AI-EXTRACTED SUBJECT
@@ -1459,6 +1467,18 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
             raise HTTPException(status_code=500, detail="Invalid API response")
         
         reply = result["choices"][0]["message"]["content"].strip()
+
+        # Add marketing disclaimer
+        note = (
+    "\n\n___________________________________________________________________________________________________________________\n"
+    "NOTE: This Email is Generated using RespondX AI Assistant — "
+    "Get it here: https://chromewebstore.google.com/detail/mjehcgcmiehakjkcegdanjlnkilaliml"
+    "\nDeveloped by Pramod Baviskar"
+)
+
+
+        reply = reply + note
+
         
         # Cache the result in background
         background_tasks.add_task(response_cache.set, cache_key, reply)
