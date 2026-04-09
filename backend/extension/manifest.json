@@ -7,7 +7,8 @@
   "host_permissions": [
     "https://mail.google.com/*",
     "https://gmail-llm-based-auto-reply.vercel.app/*",
-    "https://gmail-llm-based-auto-reply.onrender.com/*"
+    "https://gmail-llm-based-auto-reply.onrender.com/*",
+    "http://localhost:8000/*"
   ],
   "icons": {
     "16": "icon3.png",
@@ -17,7 +18,7 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["content.js", "content-compose.js"],
+      "js": ["content.js", "content-compose.js", "features.js"],
       "css": ["compose-styles.css"],
       "run_at": "document_idle"
     }

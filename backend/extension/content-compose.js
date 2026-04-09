@@ -7,8 +7,8 @@ class GmailComposeFeature {
         this.composeButton = null;
         this.initialized = false;
         this.darkMode = false;
-        this.API_URL = 'https://gmail-llm-based-auto-reply.onrender.com'; 
-        this.BACKUP_API_URL = 'https://gmail-llm-based-auto-reply.vercel.app';
+        this.API_URL = 'http://localhost:8000';
+        this.BACKUP_API_URL = 'http://localhost:8000';
         // ADD THESE NEW LINES:
         this.recognition = null;
         this.isListening = false;

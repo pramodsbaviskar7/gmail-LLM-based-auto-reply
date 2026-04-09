@@ -2,8 +2,8 @@ console.log("✅ Gmail Auto LLM Reply: Content script loaded");
 
 const BUTTON_ID = "auto-reply-button";
 const MODAL_ID = "auto-reply-modal";
-const BACKEND_URL = "https://gmail-llm-based-auto-reply.vercel.app";
-const FALLBACK_URL = "https://gmail-llm-based-auto-reply.onrender.com";
+const BACKEND_URL = "http://localhost:8000";
+const FALLBACK_URL = "http://localhost:8000";
 let checkInterval = null;
 let currentUrl = window.location.href;
 let userPreferences = null;
@@ -1896,74 +1896,125 @@ function extractReceiverEmail() {
   return null;
 }
 
+// Finds the Gmail Reply button using multiple selector fallbacks
+function findReplyButton() {
+  const selectors = [
+    'div[role="button"][aria-label="Reply"]',
+    'div[role="button"][aria-label*="Reply"]',
+    '[data-tooltip="Reply"]',
+    '[data-tooltip*="Reply"]',
+    'button[aria-label*="Reply"]',
+    '.ams[data-tooltip*="Reply"]',
+    '.T-I[data-tooltip="Reply"]',
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.offsetParent !== null) return el;
+  }
+  return null;
+}
+
+// Waits for the compose box to appear after clicking Reply, then calls cb(composeBox)
+function waitForComposeBox(cb, maxWaitMs = 4000) {
+  const composeSelectors = [
+    'div[role="textbox"][aria-label*="Message Body"]',
+    'div[role="textbox"][aria-label*="message"]',
+    'div[contenteditable="true"][aria-label*="Message Body"]',
+    '.Am.Al.editable[contenteditable="true"]',
+    'div[g_editable="true"]',
+    'div[contenteditable="true"].Am',
+  ];
+
+  const started = Date.now();
+  const interval = setInterval(() => {
+    for (const sel of composeSelectors) {
+      const box = document.querySelector(sel);
+      if (box && box.offsetParent !== null) {
+        clearInterval(interval);
+        cb(box);
+        return;
+      }
+    }
+    if (Date.now() - started > maxWaitMs) {
+      clearInterval(interval);
+      cb(null);
+    }
+  }, 200);
+}
+
 // Function to insert reply into Gmail compose box
 function insertReplyIntoGmail(replyText) {
-  const replyButton = document.querySelector('div[role="button"][aria-label*="Reply"]');
+  const replyButton = findReplyButton();
   if (replyButton) {
     replyButton.click();
-    
-    setTimeout(() => {
-      const composeBox = document.querySelector('div[role="textbox"][aria-label*="Message Body"]');
+    waitForComposeBox((composeBox) => {
       if (composeBox) {
         composeBox.focus();
         document.execCommand('selectAll');
         document.execCommand('insertText', false, replyText);
         console.log("✅ Reply inserted into compose box");
       } else {
-        console.error("Could not find compose box");
-        alert("Please click Reply manually and then try again.");
+        console.error("Could not find compose box after waiting");
+        alert("Could not find Gmail compose box. Please click Reply manually and try again.");
       }
-    }, 1000);
+    });
   } else {
-    alert("Please click Reply manually first.");
+    // Compose box may already be open (user clicked Reply earlier)
+    waitForComposeBox((composeBox) => {
+      if (composeBox) {
+        composeBox.focus();
+        document.execCommand('selectAll');
+        document.execCommand('insertText', false, replyText);
+        console.log("✅ Reply inserted into existing compose box");
+      } else {
+        alert("Could not find Gmail Reply button. Please click Reply in Gmail first, then try again.");
+      }
+    }, 500);
   }
 }
 
 // Function to directly send the reply
 function directReplyEmail(replyText) {
-  const replyButton = document.querySelector('div[role="button"][aria-label*="Reply"]');
+  const replyButton = findReplyButton();
+
+  const doInsertAndSend = (composeBox) => {
+    if (!composeBox) {
+      alert("Could not find Gmail compose box. Please click Reply manually and try again.");
+      return;
+    }
+    composeBox.focus();
+    document.execCommand('selectAll');
+    document.execCommand('insertText', false, replyText);
+
+    setTimeout(() => {
+      const sendSelectors = [
+        'div[role="button"][aria-label*="Send"][aria-label*="Ctrl"]',
+        'div[role="button"][aria-label*="Send"]',
+        '[data-tooltip*="Send"]',
+        'div.T-I.J-J5-Ji.aoO.T-I-atl.L3',
+        '.aoO',
+      ];
+      let sendButton = null;
+      for (const sel of sendSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.offsetParent !== null) { sendButton = el; break; }
+      }
+      if (sendButton) {
+        sendButton.click();
+        console.log("✅ Reply sent successfully");
+        showSuccessNotification("Reply sent successfully!");
+      } else {
+        alert("Could not find Send button. Please send manually.");
+      }
+    }, 600);
+  };
+
   if (replyButton) {
     replyButton.click();
-    
-    setTimeout(() => {
-      const composeBox = document.querySelector('div[role="textbox"][aria-label*="Message Body"]');
-      if (composeBox) {
-        composeBox.focus();
-        document.execCommand('selectAll');
-        document.execCommand('insertText', false, replyText);
-        
-        setTimeout(() => {
-          const sendSelectors = [
-            'div[role="button"][aria-label*="Send"][aria-label*="Ctrl+Enter"]',
-            'div[role="button"][aria-label*="Send"]',
-            'div[data-tooltip*="Send"]',
-            'div.T-I.J-J5-Ji.aoO.T-I-atl.L3'
-          ];
-          
-          let sendButton = null;
-          for (const selector of sendSelectors) {
-            sendButton = document.querySelector(selector);
-            if (sendButton && sendButton.offsetHeight > 0) {
-              break;
-            }
-          }
-          
-          if (sendButton) {
-            sendButton.click();
-            console.log("✅ Reply sent successfully");
-            showSuccessNotification("Reply sent successfully!");
-          } else {
-            console.error("Could not find send button");
-            alert("Could not find send button. Please send manually.");
-          }
-        }, 500);
-      } else {
-        console.error("Could not find compose box");
-        alert("Please click Reply manually and then try again.");
-      }
-    }, 1000);
+    waitForComposeBox(doInsertAndSend);
   } else {
-    alert("Please click Reply manually first.");
+    // Try existing open compose box
+    waitForComposeBox(doInsertAndSend, 500);
   }
 }
 
@@ -2242,7 +2293,7 @@ async function generateReplyContent(emailContent, useCustomPrompt, customPrompt,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(45000)
       });
     } catch (primaryError) {
       console.warn("Primary API failed, switching to fallback:", primaryError.message);
@@ -2544,7 +2595,7 @@ async function analyzeEmailThread(threadData) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(45000)
       });
     } catch (primaryError) {
       console.warn("Primary analyze-thread API failed, trying fallback:", primaryError.message);

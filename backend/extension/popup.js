@@ -161,28 +161,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Load saved preferences
   function loadSavedPreferences() {
-    console.log('Loading saved preferences');
-    
     const storage = getStorage();
-    if (!storage) {
-      console.error('Chrome storage not available for loading - ensure extension has storage permission');
-      return;
-    }
-    
+    if (!storage) return;
+
     storage.get(['userEmail', 'userInfo'], function(result) {
-      if (chrome.runtime.lastError) {
-        console.error('Load preferences error:', chrome.runtime.lastError);
-        return;
-      }
-      
-      console.log('Loaded preferences:', result);
-      
+      if (chrome.runtime.lastError) return;
       if (result.userInfo) {
         const fullNameField = document.getElementById('fullName');
         const emailField = document.getElementById('email');
         const linkedinField = document.getElementById('linkedin');
         const phoneField = document.getElementById('phone');
-        
         if (fullNameField) fullNameField.value = result.userInfo.full_name || '';
         if (emailField) emailField.value = result.userInfo.email || result.userEmail || '';
         if (linkedinField) linkedinField.value = result.userInfo.linkedin || '';
@@ -191,6 +179,129 @@ document.addEventListener('DOMContentLoaded', function() {
         const emailField = document.getElementById('email');
         if (emailField) emailField.value = result.userEmail;
       }
+    });
+  }
+
+  // ── Feature 11: Context Injection ──────────────────────────────────────────
+  const contextField = document.getElementById('userContext');
+  const saveContextBtn = document.getElementById('saveContextBtn');
+  const contextSuccess = document.getElementById('contextSuccess');
+
+  // Load saved context
+  const storage = getStorage();
+  if (storage) {
+    storage.get(['userContext'], function(result) {
+      if (contextField && result.userContext) contextField.value = result.userContext;
+    });
+  }
+
+  if (saveContextBtn) {
+    saveContextBtn.addEventListener('click', function() {
+      const ctx = contextField ? contextField.value.trim() : '';
+      const s = getStorage();
+      if (!s) return;
+      s.set({ userContext: ctx }, function() {
+        if (chrome.runtime.lastError) return;
+        if (contextSuccess) {
+          contextSuccess.style.display = 'block';
+          setTimeout(() => { contextSuccess.style.display = 'none'; }, 2500);
+        }
+      });
+    });
+  }
+
+  // ── Feature 10: Templates Library ──────────────────────────────────────────
+  function loadTemplates() {
+    const s = getStorage();
+    if (!s) return;
+    s.get(['rxTemplates'], function(result) {
+      const templates = result.rxTemplates || [];
+      renderTemplates(templates);
+    });
+  }
+
+  function renderTemplates(templates) {
+    const list = document.getElementById('templatesList');
+    if (!list) return;
+    if (!templates.length) {
+      list.innerHTML = '<div style="font-size:12px; color:#9ca3af; margin-bottom:8px;">No templates saved yet.</div>';
+      return;
+    }
+    list.innerHTML = templates.map((t, i) => `
+      <div class="template-item">
+        <span title="${t.content}">${t.name}</span>
+        <button data-idx="${i}">Delete</button>
+      </div>`).join('');
+
+    list.querySelectorAll('button[data-idx]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.getAttribute('data-idx'));
+        const s = getStorage();
+        if (!s) return;
+        s.get(['rxTemplates'], function(result) {
+          const tpls = result.rxTemplates || [];
+          tpls.splice(idx, 1);
+          s.set({ rxTemplates: tpls }, () => loadTemplates());
+        });
+      });
+    });
+  }
+
+  const saveTemplateBtn = document.getElementById('saveTemplateBtn');
+  if (saveTemplateBtn) {
+    saveTemplateBtn.addEventListener('click', function() {
+      const name = document.getElementById('templateName')?.value.trim();
+      const content = document.getElementById('templateContent')?.value.trim();
+      if (!name || !content) return;
+      const s = getStorage();
+      if (!s) return;
+      s.get(['rxTemplates'], function(result) {
+        const tpls = result.rxTemplates || [];
+        tpls.push({ name, content, createdAt: Date.now() });
+        s.set({ rxTemplates: tpls }, function() {
+          document.getElementById('templateName').value = '';
+          document.getElementById('templateContent').value = '';
+          loadTemplates();
+        });
+      });
+    });
+  }
+
+  loadTemplates();
+
+  // ── Settings ────────────────────────────────────────────────────────────────
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const settingsSuccess = document.getElementById('settingsSuccess');
+
+  // Load saved settings
+  if (storage) {
+    storage.get(['rxSettings'], function(result) {
+      const s = result.rxSettings || {};
+      const followupDaysEl = document.getElementById('followupDays');
+      const sentimentEl = document.getElementById('sentimentWarning');
+      const badgeEl = document.getElementById('inboxBadge');
+      if (followupDaysEl) followupDaysEl.value = s.followupDays || 3;
+      if (sentimentEl) sentimentEl.checked = s.sentimentWarning !== false;
+      if (badgeEl) badgeEl.checked = s.inboxBadge !== false;
+    });
+  }
+
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', function() {
+      const settings = {
+        followupDays: parseInt(document.getElementById('followupDays')?.value || 3),
+        sentimentWarning: document.getElementById('sentimentWarning')?.checked !== false,
+        inboxBadge: document.getElementById('inboxBadge')?.checked !== false,
+      };
+      const s = getStorage();
+      if (!s) return;
+      s.set({ rxSettings: settings }, function() {
+        if (chrome.runtime.lastError) return;
+        if (settingsSuccess) {
+          settingsSuccess.style.display = 'block';
+          setTimeout(() => { settingsSuccess.style.display = 'none'; }, 2500);
+        }
+      });
     });
   }
 });

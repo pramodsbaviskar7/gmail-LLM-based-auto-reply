@@ -6,13 +6,14 @@ import re
 import time
 import hashlib
 import hmac
+import textwrap
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from functools import wraps
 from collections import defaultdict, OrderedDict
 from threading import Lock
-import weakref
 import gc
 
 # Core FastAPI and HTTP components
@@ -21,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import aiohttp
 from dotenv import load_dotenv
 import tiktoken
@@ -304,62 +305,35 @@ config = {
     "ENVIRONMENT": os.getenv("ENVIRONMENT", "development")
 }
 
-logger.info("✅ Configuration loaded successfully")
-try:
-    # FORCE RELOAD ENVIRONMENT - DEBUG
-    print("🔧 FORCING FRESH .ENV RELOAD...")
-    from pathlib import Path
-    from dotenv import load_dotenv
-    
-    # Clear any cached environment variables
-    import os
-    if 'GROQ_API_KEY' in os.environ:
-        print(f"Clearing cached GROQ_API_KEY: {os.environ['GROQ_API_KEY'][:20]}...")
-        del os.environ['GROQ_API_KEY']
-    
-    # Force reload .env file
-    env_path = Path(__file__).parent / '.env'
-    print(f"Force loading .env from: {env_path}")
-    load_dotenv(env_path, override=True)
-    
-    # Test immediate load
-    fresh_key = os.getenv("GROQ_API_KEY")
-    print(f"Fresh API key loaded: {fresh_key[:20] if fresh_key else 'NONE'}...")
-    print("=" * 50)
-    
-    GROQ_API_KEY = config["GROQ_API_KEY"]
-    API_SECRET_KEY = config["API_SECRET_KEY"]
-    
-    print(f"Final GROQ_API_KEY in use: {GROQ_API_KEY[:20] if GROQ_API_KEY else 'NONE'}...")
-    logger.info("Configuration loaded successfully")
-except Exception as e:
-    logger.error(f"Configuration loading failed: {e}")
-    raise
+logger.info("Configuration loaded successfully")
+GROQ_API_KEY = config["GROQ_API_KEY"]
+API_SECRET_KEY = config["API_SECRET_KEY"]
 
 # Initialize global components
 response_cache = ThreadSafeCache(
-    max_size=config["CACHE_MAX_SIZE"], 
+    max_size=config["CACHE_MAX_SIZE"],
     default_ttl=config["CACHE_TTL_SECONDS"]
 )
 rate_limiter = InMemoryRateLimiter()
 groq_circuit_breaker = CircuitBreaker()
 concurrent_requests = asyncio.Semaphore(config["MAX_CONCURRENT_REQUESTS"])
 
+# Shared aiohttp session — created on startup, closed on shutdown
+groq_session: Optional[aiohttp.ClientSession] = None
+
 # Token counting with cache
 token_cache = ThreadSafeCache(max_size=1000, default_ttl=3600)  # 1 hour TTL
 
-def count_tokens_cached(text: str, model: str = "llama3-8b-8192") -> int:
-    cache_key = hashlib.md5(f"{text}:{model}".encode()).hexdigest()
-    
+def count_tokens_cached(text: str) -> int:
+    # tiktoken does not support Llama tokenizers; cl100k_base is used as an
+    # approximation. Counts may differ slightly from actual Groq token usage.
+    cache_key = hashlib.md5(text.encode()).hexdigest()
+
     cached_count = token_cache.get(cache_key)
     if cached_count is not None:
         return cached_count
-    
-    try:
-        enc = tiktoken.encoding_for_model(model)
-    except KeyError:
-        enc = tiktoken.get_encoding("cl100k_base")
-    
+
+    enc = tiktoken.get_encoding("cl100k_base")
     count = len(enc.encode(text))
     token_cache.set(cache_key, count)
     return count
@@ -382,7 +356,7 @@ EMAIL_CONFIG = {
 MODEL_CONFIG = {
     "model": "llama-3.3-70b-versatile",
     "temperature": 0.7,
-    "max_tokens": 500
+    "max_tokens": 7000
 }
 
 # Try to import custom config
@@ -400,9 +374,10 @@ class PromptRequest(BaseModel):
     useCustomPrompt: bool = False
     customPrompt: Optional[str] = Field(None, max_length=5000)
     receiverEmail: Optional[str] = None
-    userPreferences: Optional[Dict[str, Any]] = None  # ADD THIS LINE
-    
-    @validator('prompt')
+    userPreferences: Optional[Dict[str, Any]] = None
+
+    @field_validator('prompt')
+    @classmethod
     def validate_prompt(cls, v):
         if not v.strip():
             raise ValueError('Prompt cannot be empty')
@@ -411,8 +386,9 @@ class PromptRequest(BaseModel):
 class ThreadAnalysisRequest(BaseModel):
     thread: Dict[str, Any]
     autoTruncate: bool = True
-    
-    @validator('thread')
+
+    @field_validator('thread')
+    @classmethod
     def validate_thread(cls, v):
         if not v.get('completeThreadText', '').strip():
             raise ValueError('Thread text cannot be empty')
@@ -453,11 +429,41 @@ class GroqAPIError(Exception):
         self.message = message
         super().__init__(f"Groq API error: {status_code} - {message}")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application startup and shutdown."""
+    global groq_session
+    logger.info("RespondX API v2.0.0 starting up...")
+    logger.info(
+        f"Configuration: Rate limit: {config['RATE_LIMIT_PER_MINUTE']}/min, "
+        f"Max concurrent: {config['MAX_CONCURRENT_REQUESTS']}, "
+        f"Cache size: {config['CACHE_MAX_SIZE']}"
+    )
+    connector = aiohttp.TCPConnector(
+        limit=100,
+        limit_per_host=20,
+        ttl_dns_cache=300,
+        use_dns_cache=True,
+    )
+    groq_session = aiohttp.ClientSession(connector=connector)
+    asyncio.create_task(cleanup_caches())
+    logger.info("Shared HTTP session and background cleanup task started")
+
+    yield  # Application runs here
+
+    logger.info("RespondX API shutting down...")
+    await groq_session.close()
+    response_cache.clear()
+    token_cache.clear()
+    logger.info("Caches cleared and HTTP session closed, shutdown complete")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="RespondX API",
     description="High-performance Gmail Auto Reply API",
     version="2.0.0",
+    lifespan=lifespan,
     docs_url="/docs" if os.getenv("ENVIRONMENT") == "development" else None,
     redoc_url="/redoc" if os.getenv("ENVIRONMENT") == "development" else None
 )
@@ -508,7 +514,7 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS if os.getenv("ENVIRONMENT") == "production" else ["*"],
+    allow_origins=ALLOWED_ORIGINS,  # always use explicit list — wildcard + credentials is invalid per CORS spec
     allow_credentials=True,
     allow_methods=["GET", "POST", "HEAD", "OPTIONS"],
     allow_headers=["*"],
@@ -526,8 +532,8 @@ async def security_and_logging_middleware(request: Request, call_next):
     # Log request
     logger.info(f"Request: {request.method} {request.url.path} from {client_ip}")
     
-    # Basic rate limiting check
-    if request.url.path in ["/generate", "/analyze-thread"]:
+    # Basic rate limiting check (covers all AI endpoints)
+    if request.url.path in ["/generate", "/analyze-thread", "/analyze-email", "/check-draft-sentiment", "/meeting-reply"]:
         allowed, current_requests = rate_limiter.is_allowed(
             client_ip, 
             config["RATE_LIMIT_PER_MINUTE"], 
@@ -587,67 +593,52 @@ async def cleanup_caches():
 async def make_groq_request(payload: dict, max_retries: int = 3) -> dict:
     if not groq_circuit_breaker.can_execute():
         raise HTTPException(
-            status_code=503, 
+            status_code=503,
             detail="Service temporarily unavailable due to high error rate"
         )
-    
+
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
-        "User-Agent": "RespondX-API/2.0"  # Move User-Agent here
+        "User-Agent": "RespondX-API/2.0"
     }
-    
+
     async with concurrent_requests:
-        connector = aiohttp.TCPConnector(
-            limit=100,
-            limit_per_host=20,
-            ttl_dns_cache=300,
-            use_dns_cache=True,
-        )
-        
-        timeout = aiohttp.ClientTimeout(total=30)
-        
-        # Remove session-level headers
-        async with aiohttp.ClientSession(
-            connector=connector,
-            timeout=timeout
-        ) as session:
-            
-            for attempt in range(max_retries):
-                try:
-                    async with session.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        json=payload,
-                        headers=headers,  # All headers together
-                        timeout=aiohttp.ClientTimeout(total=30 + (attempt * 10))
-                    ) as response:
-                        response_text = await response.text()
-                        
-                        if response.status == 200:
-                            groq_circuit_breaker.record_success()
-                            return json.loads(response_text)
-                        
-                        if response.status == 429:  # Rate limited
-                            wait_time = min(2 ** attempt + (attempt * 0.1), 30)
-                            logger.warning(f"Rate limited by Groq, waiting {wait_time}s")
-                            await asyncio.sleep(wait_time)
-                            continue
-                        
-                        # Parse error
-                        try:
-                            error_data = json.loads(response_text)
-                            error_message = error_data.get("error", {}).get("message", "Unknown error")
-                        except json.JSONDecodeError:
-                            error_message = response_text[:200]
-                        
-                        if attempt == max_retries - 1:
-                            groq_circuit_breaker.record_failure()
-                            raise GroqAPIError(response.status, error_message)
-                        
-                        if response.status >= 500:
-                            await asyncio.sleep(min(2 ** attempt, 10))
-                            
-                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        for attempt in range(max_retries):
+            try:
+                async with groq_session.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30 + (attempt * 10))
+                ) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        groq_circuit_breaker.record_success()
+                        return json.loads(response_text)
+
+                    if response.status == 429:  # Rate limited
+                        wait_time = min(2 ** attempt + (attempt * 0.1), 30)
+                        logger.warning(f"Rate limited by Groq, waiting {wait_time}s")
+                        await asyncio.sleep(wait_time)
+                        continue
+
+                    # Parse error
+                    try:
+                        error_data = json.loads(response_text)
+                        error_message = error_data.get("error", {}).get("message", "Unknown error")
+                    except json.JSONDecodeError:
+                        error_message = response_text[:200]
+
+                    if attempt == max_retries - 1:
+                        groq_circuit_breaker.record_failure()
+                        raise GroqAPIError(response.status, error_message)
+
+                    if response.status >= 500:
+                        await asyncio.sleep(min(2 ** attempt, 10))
+
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     logger.error(f"Network error on attempt {attempt + 1}: {e}")
                     if attempt == max_retries - 1:
                         groq_circuit_breaker.record_failure()
@@ -656,11 +647,7 @@ async def make_groq_request(payload: dict, max_retries: int = 3) -> dict:
     
     raise HTTPException(status_code=503, detail="Service unavailable after all retries")
 
-# Add these imports to your existing main.py file (after your existing imports)
 from enum import Enum
-from typing import List, Optional
-
-# Add these Pydantic models after your existing models (after ThreadAnalysisRequest)
 
 class ToneEnum(str, Enum):
     professional = "professional"
@@ -770,7 +757,8 @@ class ComposeRequest(BaseModel):
     formStateId: Optional[float] = Field(None, description="Form state ID")
     timestamp: Optional[int] = Field(None, description="Timestamp")
     
-    @validator('prompt')
+    @field_validator('prompt')
+    @classmethod
     def validate_prompt(cls, v):
         if not v.strip():
             raise ValueError('Prompt cannot be empty')
@@ -1093,9 +1081,9 @@ When user requests "hindi bhasha mein" or similar, write in PROPER SCRIPT (द�
     return system_prompt
 
 
-# Helper function to generate subject line
 def generate_subject_line(prompt: str, response_type: str, custom_subject: Optional[str] = None) -> str:
-    """Generate an appropriate subject line"""
+    """Fallback subject line generator used when the AI response does not include a subject.
+    Uses simple keyword matching; prefer the AI-extracted subject whenever available."""
     
     if custom_subject:
         return custom_subject.strip()
@@ -1125,10 +1113,6 @@ def generate_subject_line(prompt: str, response_type: str, custom_subject: Optio
     
     return subject_templates.get(response_type, "Response")
 
-# Add this endpoint to your FastAPI app (add after your existing endpoints)
-
-import re
-
 def extract_subject_from_email(email_content: str) -> tuple[str, str]:
     """
     Extract subject line from AI-generated email content and return clean body.
@@ -1149,15 +1133,15 @@ def extract_subject_from_email(email_content: str) -> tuple[str, str]:
     if subject_match:
         # Extract the subject
         extracted_subject = subject_match.group(1).strip()
-        
+
         # Remove the subject line from the body
         clean_body = re.sub(subject_pattern, '', email_content.strip(), flags=re.IGNORECASE | re.MULTILINE).strip()
-        
-        print(f"📧 Extracted subject from AI: '{extracted_subject}'")
+
+        logger.debug(f"Extracted subject from AI: '{extracted_subject}'")
         return extracted_subject, clean_body
-    
+
     # If no subject found in content, return None and original body
-    print("📧 No subject found in AI content")
+    logger.debug("No subject found in AI content")
     return None, email_content.strip()
 
 @app.post("/api/compose", response_model=ComposeResponse)
@@ -1175,13 +1159,9 @@ async def compose_email(
         # Sanitize input
         prompt_text = sanitize_input(compose_request.prompt)
         
-        # DEBUG: Log the parameters we're receiving
-        print(f"🎯 useEmojis: {compose_request.useEmojis}")
-        print(f"🎯 tone: {compose_request.tone}")
-        print(f"🎯 includeGreeting: {compose_request.includeGreeting}")
-        print(f"🎯 includeClosing: {compose_request.includeClosing}")
-        print(f"🎯 includeSignature: {compose_request.includeSignature}")
-        print(f"🎯 userPreferences: {compose_request.userPreferences}")
+        logger.debug(f"compose params — tone={compose_request.tone}, useEmojis={compose_request.useEmojis}, "
+                     f"includeGreeting={compose_request.includeGreeting}, includeClosing={compose_request.includeClosing}, "
+                     f"includeSignature={compose_request.includeSignature}, hasPrefs={bool(compose_request.userPreferences)}")
         
         # 🔥 NEW: Determine user info based on preferences
         if compose_request.userPreferences and compose_request.userPreferences.hasPreferences:
@@ -1192,26 +1172,20 @@ async def compose_email(
                 "linkedin": compose_request.userPreferences.linkedin or "https://www.linkedin.com/in/yourprofile",
                 "mobile": compose_request.userPreferences.mobile or "+1 (555) 123-4567"
             }
-            print(f"✅ Using saved user preferences: {selected_user_info}")
+            logger.debug(f"Using saved user preferences: {selected_user_info}")
         else:
-            # Fallback logic (same as before)
-            user_identity = compose_request.recipientContext or ""
-            if "pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity:
-                selected_user_info = USER_INFO
-            else:
-                selected_user_info = {
-                    "full_name": "Your Name",
-                    "email": "your.email@company.com",
-                    "linkedin": "https://www.linkedin.com/in/yourprofile",
-                    "mobile": "+1 (555) 123-4567"
-                }
-            print(f"📝 Using fallback user info: {selected_user_info}")
+            selected_user_info = {
+                "full_name": "Your Name",
+                "email": "your.email@company.com",
+                "linkedin": "https://www.linkedin.com/in/yourprofile",
+                "mobile": "+1 (555) 123-4567"
+            }
+            logger.debug(f"Using fallback user info: {selected_user_info}")
         
         # Build the system prompt with the determined user info
         system_prompt = build_compose_prompt(compose_request, selected_user_info)
         
-        # DEBUG: Log the system prompt to see if parameters are being used
-        print(f"📝 System prompt snippet: {system_prompt[:200]}...")
+        logger.debug(f"System prompt snippet: {system_prompt[:200]}...")
         
         # Create user message
         user_message = f"Write an email about: {prompt_text}"
@@ -1237,9 +1211,8 @@ async def compose_email(
         if "choices" not in result or len(result["choices"]) == 0:
             raise HTTPException(status_code=500, detail="Invalid API response")
         
-        # 🔥 GET RAW AI RESPONSE
         raw_email_content = result["choices"][0]["message"]["content"].strip()
-        print(f"🤖 Raw AI response: {raw_email_content[:200]}...")
+        logger.debug(f"Raw AI response: {raw_email_content[:200]}...")
         
         # 🔥 EXTRACT SUBJECT FROM AI RESPONSE
         extracted_subject, clean_email_body = extract_subject_from_email(raw_email_content)
@@ -1247,25 +1220,24 @@ async def compose_email(
         # 🔥 USE EXTRACTED SUBJECT OR FALLBACK
         if extracted_subject:
             final_subject = extracted_subject
-            print(f"✅ Using AI-extracted subject: '{final_subject}'")
+            logger.debug(f"Using AI-extracted subject: '{final_subject}'")
         else:
-            # Fallback to old method if extraction fails
+            # Fallback to template-based subject if AI did not include one
             final_subject = generate_subject_line(
-                prompt_text, 
+                prompt_text,
                 compose_request.responseType,
                 compose_request.subjectLine
             )
-            clean_email_body = raw_email_content  # Use original content if no subject extracted
-            print(f"🔄 Using fallback subject: '{final_subject}'")
-        
-        print("final_subject:", final_subject)
-        print("final_email_body length:", len(clean_email_body))
+            clean_email_body = raw_email_content
+            logger.debug(f"Using fallback subject: '{final_subject}'")
+
+        logger.debug(f"final_subject='{final_subject}', body_length={len(clean_email_body)}")
         # Add marketing disclaimer
         note = (
     "\n\n___________________________________________________________________________________________________________________\n"
     "NOTE: This Email is Generated using RespondX AI Assistant — "
     "Get it here: https://chromewebstore.google.com/detail/mjehcgcmiehakjkcegdanjlnkilaliml"
-    "\nDeveloped by Pramod Baviskar"
+    "\nDeveloped by Pramod Baviskar — https://www.linkedin.com/in/pramodsbaviskar/"
 )        
         clean_email_body = clean_email_body + note
 
@@ -1287,7 +1259,6 @@ async def compose_email(
         }
         
         logger.info(f"Generated email successfully - Subject: {final_subject}, Body length: {len(clean_email_body)}")
-        print(f"✅ Generated email with signature preferences")
         
         return ComposeResponse(**response_data)
         
@@ -1340,15 +1311,12 @@ async def generate_reply(request: Request, prompt_request: PromptRequest, backgr
         # Sanitize inputs
         prompt_text = sanitize_input(prompt_request.prompt)
         custom_prompt = sanitize_input(prompt_request.customPrompt) if prompt_request.customPrompt else None
-        # Now you can access userPreferences
         if prompt_request.userPreferences:
             user_prefs = prompt_request.userPreferences
-            print(f"User preferences: {user_prefs}")
-            print(f"User email: {user_prefs.email if hasattr(user_prefs, 'email') else user_prefs.get('email')}")
-            print(f"User name: {user_prefs.full_name if hasattr(user_prefs, 'full_name') else user_prefs.get('full_name')}")
+            logger.debug(f"User preferences received: email={user_prefs.get('email')}, name={user_prefs.get('full_name')}")
         else:
-            print("No user preferences provided")
-        cache_key = get_cache_key(prompt_request.dict())
+            logger.debug("No user preferences provided")
+        cache_key = get_cache_key(prompt_request.model_dump())
         cached_response = response_cache.get(cache_key)
         
         if cached_response:
@@ -1366,20 +1334,12 @@ async def generate_reply(request: Request, prompt_request: PromptRequest, backgr
                 "mobile": user_prefs.get('mobile') or "+1 (555) 123-4567"
             }
         else:
-            # Fallback to existing logic
-            user_identity = prompt_request.receiverEmail or ""
-            logger.info(f"mail received:\n{user_identity}")
-            if user_identity and ("pramodsbaviskar7@gmail.com" in user_identity or "pramod baviskar" in user_identity):
-                selected_user_info = USER_INFO
-            else:
-                selected_user_info = {
-        "full_name": "Your Name",
-        "email": "your.email@company.com",
-        "linkedin": "https://www.linkedin.com/in/yourprofile",
-        "mobile": "+1 (555) 123-4567"
-    }
-        import textwrap
-
+            selected_user_info = {
+                "full_name": "Your Name",
+                "email": "your.email@company.com",
+                "linkedin": "https://www.linkedin.com/in/yourprofile",
+                "mobile": "+1 (555) 123-4567"
+            }
         signature_template = textwrap.dedent(f"""\
     {EMAIL_CONFIG['default_closing']},
     {selected_user_info['full_name']}
@@ -1473,7 +1433,7 @@ I'll have this ready for you by tomorrow afternoon. Would you prefer to receive 
     "\n\n___________________________________________________________________________________________________________________\n"
     "NOTE: This Email is Generated using RespondX AI Assistant — "
     "Get it here: https://chromewebstore.google.com/detail/mjehcgcmiehakjkcegdanjlnkilaliml"
-    "\nDeveloped by Pramod Baviskar"
+    "\nDeveloped by Pramod Baviskar — https://www.linkedin.com/in/pramodsbaviskar/"
 )
 
 
@@ -1508,13 +1468,16 @@ async def analyze_email_thread(request: Request, thread_request: ThreadAnalysisR
         if cached_analysis:
             return {"analysis": cached_analysis, "cached": True}
         
-        # Token limit check
+        # Token limit check — use a safe input cap (50k tokens ≈ 200k chars),
+        # well within the model's 128k context window. max_tokens is the OUTPUT limit,
+        # not the input context limit, so it must not be used here.
+        INPUT_TOKEN_LIMIT = 50000
         token_count = count_tokens_cached(email_chain)
-        max_tokens = MODEL_CONFIG['max_tokens']
-        
-        if token_count > max_tokens:
+
+        if token_count > INPUT_TOKEN_LIMIT:
             if thread_request.autoTruncate:
-                email_chain = email_chain[-max_tokens * 3:]  # Rough truncation
+                # Keep the most recent portion (tail) of the thread
+                email_chain = email_chain[-(INPUT_TOKEN_LIMIT * 4):]  # ~4 chars per token
             else:
                 raise HTTPException(status_code=413, detail="Input too long")
         
@@ -1758,7 +1721,7 @@ async def get_cache_by_key(cache_key: str):
     }
 
 @app.get("/admin/cache/stats/detailed")
-async def detailed_cache_stats():
+async def detailed_cache_stats_by_entry():
     """Get detailed cache statistics with size breakdown"""
     with response_cache._lock:
         cache_data = {}
@@ -1816,25 +1779,148 @@ async def warm_cache():
         "warmed_keys": warmed_keys
     }
 
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
-    logger.info("RespondX API v2.0.0 starting up...")
-    logger.info(f"Configuration: Rate limit: {config['RATE_LIMIT_PER_MINUTE']}/min, "
-                f"Max concurrent: {config['MAX_CONCURRENT_REQUESTS']}, "
-                f"Cache size: {config['CACHE_MAX_SIZE']}")
-    
-    # Start background cleanup task
-    asyncio.create_task(cleanup_caches())
-    logger.info("Background cleanup task started")
+# ─── New feature endpoints ────────────────────────────────────────────────────
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("RespondX API shutting down...")
-    # Clear caches to free memory
-    response_cache.clear()
-    token_cache.clear()
-    logger.info("Caches cleared, shutdown complete")
+class EmailAnalysisRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=50000)
+    context: Optional[str] = Field(None, max_length=5000)  # user "about me" context
+
+class DraftSentimentRequest(BaseModel):
+    draft: str = Field(..., min_length=1, max_length=10000)
+    original: Optional[str] = Field(None, max_length=50000)
+
+@app.post("/analyze-email")
+@limiter.limit("30/minute")
+async def analyze_email_features(request: Request, data: EmailAnalysisRequest):
+    """
+    Analyzes an email and returns:
+    - detected language
+    - whether it contains a meeting request
+    - action items
+    - one-line quick summary
+    - overall sentiment
+    """
+    text = sanitize_input(data.text)
+    cache_key = hashlib.md5(f"analyze:{text[:500]}".encode()).hexdigest()
+    cached = response_cache.get(cache_key)
+    if cached:
+        return {"result": cached, "cached": True}
+
+    prompt = """Analyze this email and return ONLY a valid JSON object — no extra text.
+
+{
+  "language": "<full language name e.g. english, spanish, hindi>",
+  "language_code": "<ISO 639-1 code e.g. en, es, hi>",
+  "meeting_detected": <true|false>,
+  "meeting_details": "<brief description of meeting request or null>",
+  "action_items": ["<action 1>", "<action 2>"],
+  "quick_summary": "<one sentence TL;DR of the email>",
+  "sentiment": "<positive|neutral|negative>"
+}"""
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Email:\n{text}"}
+        ],
+        "model": MODEL_CONFIG["model"],
+        "temperature": 0.2,
+        "max_tokens": 500
+    }
+
+    result = await make_groq_request(payload)
+    raw = result["choices"][0]["message"]["content"].strip()
+
+    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if not json_match:
+        raise HTTPException(status_code=500, detail="Could not parse email analysis")
+
+    analysis = json.loads(json_match.group(0))
+    response_cache.set(cache_key, analysis, ttl=300)
+    return {"result": analysis, "cached": False}
+
+
+@app.post("/check-draft-sentiment")
+@limiter.limit("30/minute")
+async def check_draft_sentiment(request: Request, data: DraftSentimentRequest):
+    """
+    Checks if an outgoing draft has a negative or aggressive tone.
+    Returns a warning and improvement suggestion if needed.
+    """
+    draft = sanitize_input(data.draft)
+    if len(draft.split()) < 5:
+        return {"needs_warning": False, "sentiment": "neutral"}
+
+    prompt = """You are a professional communication coach. Analyze this email draft for tone.
+Return ONLY a valid JSON object:
+
+{
+  "sentiment": "<positive|neutral|negative|aggressive>",
+  "needs_warning": <true if tone could damage the relationship, else false>,
+  "reason": "<one sentence why it might be problematic, or null>",
+  "suggestion": "<one concrete improvement tip, or null>"
+}"""
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Draft:\n{draft}"}
+        ],
+        "model": MODEL_CONFIG["model"],
+        "temperature": 0.2,
+        "max_tokens": 300
+    }
+
+    result = await make_groq_request(payload)
+    raw = result["choices"][0]["message"]["content"].strip()
+
+    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if not json_match:
+        return {"needs_warning": False, "sentiment": "neutral"}
+
+    return json.loads(json_match.group(0))
+
+
+@app.post("/meeting-reply")
+@limiter.limit("20/minute")
+async def generate_meeting_reply(request: Request, data: dict):
+    """
+    Generates a professional meeting reply given the original email and user's available slots.
+    """
+    original = sanitize_input(data.get("original", ""))
+    slots = sanitize_input(data.get("slots", ""))
+    user_info = data.get("userInfo", {})
+    context = sanitize_input(data.get("context", ""))
+
+    name = user_info.get("full_name", "Your Name")
+    email = user_info.get("email", "")
+
+    system_prompt = f"""You are writing a professional meeting scheduling reply.
+{"Context about the sender: " + context if context else ""}
+Write a concise, friendly reply confirming interest in meeting and proposing the given time slots.
+Sign off as {name}{(" <" + email + ">") if email else ""}.
+Do not include any meta-text — just the email body."""
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Original email:\n{original}\n\nMy available slots:\n{slots}"}
+        ],
+        "model": MODEL_CONFIG["model"],
+        "temperature": 0.6,
+        "max_tokens": 400
+    }
+
+    result = await make_groq_request(payload)
+    reply = result["choices"][0]["message"]["content"].strip()
+    return {"reply": reply}
+
+
+# ─── End new feature endpoints ────────────────────────────────────────────────
+
+# Startup and shutdown via lifespan (replaces deprecated @app.on_event)
+# NOTE: lifespan must be registered on the app; see app = FastAPI(..., lifespan=lifespan) below.
+# The actual lifespan function is defined before app creation at the top of the file.
 
 # Error handlers
 @app.exception_handler(HTTPException)
